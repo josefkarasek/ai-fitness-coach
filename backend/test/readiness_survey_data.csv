@@ -1,0 +1,1246 @@
+created_date,title,label
+2022-11-15 17:58:51,Sleep,Ok
+2022-11-15 17:58:55,Mood,Great!
+2022-11-15 17:58:57,Energy,Ok
+2022-11-15 17:58:59,Stress,Strained
+2022-11-15 17:59:12,Soreness,Moderate
+2022-11-19 12:12:19,Sleep,Good
+2022-11-19 12:12:22,Mood,Good
+2022-11-19 12:12:25,Energy,Good
+2022-11-19 12:12:29,Stress,Strained
+2022-11-19 12:12:33,Soreness,None at all
+2022-11-22 17:36:54,Sleep,Good
+2022-11-22 17:36:59,Mood,Great!
+2022-11-22 17:37:02,Energy,Good
+2022-11-22 17:37:07,Stress,Relaxed
+2022-11-22 17:37:18,Soreness,None at all
+2022-11-24 07:14:00,Sleep,Good
+2022-11-24 07:14:01,Mood,Good
+2022-11-24 07:14:03,Energy,Good
+2022-11-24 07:14:06,Stress,Not much
+2022-11-24 07:14:08,Soreness,Just a bit
+2023-01-03 17:31:58,Sleep,Excellent
+2023-01-03 17:32:00,Mood,Great!
+2023-01-03 17:32:02,Energy,Amped up
+2023-01-03 17:32:05,Stress,Not much
+2023-01-03 17:32:09,Soreness,None at all
+2023-01-05 16:26:44,Sleep,Good
+2023-01-05 16:26:46,Mood,Good
+2023-01-05 16:26:48,Energy,Good
+2023-01-05 16:26:50,Stress,Not much
+2023-01-05 16:26:52,Soreness,Just a bit
+2023-01-11 08:32:09,Sleep,Good
+2023-01-11 08:32:12,Mood,Good
+2023-01-11 08:32:13,Energy,Good
+2023-01-11 08:32:16,Stress,Not much
+2023-01-11 08:32:18,Soreness,Just a bit
+2023-01-12 07:06:54,Sleep,Good
+2023-01-12 07:06:57,Mood,Good
+2023-01-12 07:06:59,Energy,Ok
+2023-01-12 07:07:03,Stress,Not much
+2023-01-12 07:07:08,Soreness,Just a bit
+2023-01-17 17:31:56,Sleep,Excellent
+2023-01-17 17:31:59,Mood,Good
+2023-01-17 17:32:01,Energy,Good
+2023-01-17 17:32:03,Stress,Not much
+2023-01-17 17:32:07,Soreness,None at all
+2023-01-19 07:03:00,Sleep,Ok
+2023-01-19 07:03:03,Mood,Ok
+2023-01-19 07:03:05,Energy,Ok
+2023-01-19 07:03:09,Stress,Ok
+2023-01-19 07:03:12,Soreness,Moderate
+2023-01-31 17:36:40,Sleep,Excellent
+2023-01-31 17:36:42,Mood,Good
+2023-01-31 17:36:44,Energy,Ok
+2023-01-31 17:36:46,Stress,Ok
+2023-01-31 17:36:49,Soreness,Just a bit
+2023-02-02 07:03:53,Sleep,Good
+2023-02-02 07:03:56,Mood,Good
+2023-02-02 07:03:58,Energy,Good
+2023-02-02 07:04:00,Stress,Not much
+2023-02-02 07:04:03,Soreness,Moderate
+2023-02-07 17:28:44,Sleep,Poor
+2023-02-07 17:28:47,Mood,Good
+2023-02-07 17:28:52,Energy,Ok
+2023-02-07 17:28:55,Stress,Not much
+2023-02-07 17:28:59,Soreness,None at all
+2023-02-09 07:10:44,Sleep,Ok
+2023-02-09 07:10:46,Mood,Ok
+2023-02-09 07:10:48,Energy,Ok
+2023-02-09 07:10:50,Stress,Ok
+2023-02-09 07:10:53,Soreness,Just a bit
+2023-02-12 20:21:36,Sleep,Good
+2023-02-12 20:21:38,Mood,Good
+2023-02-12 20:21:40,Energy,Good
+2023-02-12 20:21:43,Stress,Not much
+2023-02-12 20:21:45,Soreness,Moderate
+2023-02-14 17:31:52,Sleep,Good
+2023-02-14 17:31:54,Mood,Good
+2023-02-14 17:31:55,Energy,Good
+2023-02-14 17:31:57,Stress,Not much
+2023-02-14 17:32:01,Soreness,Moderate
+2023-02-16 07:04:11,Sleep,Good
+2023-02-16 07:04:22,Mood,Good
+2023-02-16 07:04:24,Energy,Good
+2023-02-16 07:04:25,Stress,Not much
+2023-02-16 07:04:29,Soreness,Pretty sore
+2023-02-19 09:02:48,Sleep,Good
+2023-02-19 09:02:50,Mood,Good
+2023-02-19 09:02:52,Energy,Good
+2023-02-19 09:02:54,Stress,Not much
+2023-02-19 09:02:57,Soreness,Just a bit
+2023-02-21 17:27:46,Sleep,Excellent
+2023-02-21 17:27:49,Mood,Good
+2023-02-21 17:27:51,Energy,Amped up
+2023-02-21 17:27:56,Stress,Not much
+2023-02-21 17:27:59,Soreness,None at all
+2023-02-23 07:11:17,Sleep,Good
+2023-02-23 07:11:20,Mood,Good
+2023-02-23 07:11:23,Energy,Good
+2023-02-23 07:11:26,Stress,Ok
+2023-02-23 07:11:31,Soreness,Moderate
+2023-02-26 08:25:00,Sleep,Excellent
+2023-02-26 08:25:04,Mood,Ok
+2023-02-26 08:25:06,Energy,Good
+2023-02-26 08:25:08,Stress,Not much
+2023-02-26 08:25:11,Soreness,Moderate
+2023-02-28 17:31:55,Sleep,Good
+2023-02-28 17:31:56,Mood,Good
+2023-02-28 17:31:59,Energy,Good
+2023-02-28 17:32:00,Stress,Not much
+2023-02-28 17:32:02,Soreness,Just a bit
+2023-03-02 07:07:03,Sleep,Ok
+2023-03-02 07:07:06,Mood,Good
+2023-03-02 07:07:08,Energy,Ok
+2023-03-02 07:07:10,Stress,Ok
+2023-03-02 07:07:12,Soreness,Moderate
+2023-03-07 17:30:00,Sleep,Good
+2023-03-07 17:30:02,Mood,Good
+2023-03-07 17:30:03,Energy,Good
+2023-03-07 17:30:09,Stress,Not much
+2023-03-07 17:30:13,Soreness,Just a bit
+2023-03-14 17:33:14,Sleep,Good
+2023-03-14 17:33:16,Mood,Good
+2023-03-14 17:33:18,Energy,Good
+2023-03-14 17:33:20,Stress,Not much
+2023-03-14 17:33:22,Soreness,Pretty sore
+2023-03-16 07:05:28,Sleep,Ok
+2023-03-16 07:50:48,Mood,Good
+2023-03-16 07:50:51,Energy,Good
+2023-03-16 07:50:52,Stress,Not much
+2023-03-16 07:50:55,Soreness,Pretty sore
+2023-03-19 07:36:16,Sleep,Excellent
+2023-03-19 07:36:18,Mood,Great!
+2023-03-19 07:36:20,Energy,Amped up
+2023-03-19 07:36:22,Stress,Not much
+2023-03-19 07:36:24,Soreness,Just a bit
+2023-03-21 17:30:35,Sleep,Good
+2023-03-21 17:30:43,Mood,Good
+2023-03-21 17:30:45,Energy,Good
+2023-03-21 17:30:49,Stress,Not much
+2023-03-21 17:30:57,Soreness,Just a bit
+2023-03-23 07:00:24,Sleep,Good
+2023-03-23 07:00:28,Mood,Good
+2023-03-23 07:00:30,Energy,Good
+2023-03-23 07:00:31,Stress,Not much
+2023-03-23 07:00:32,Soreness,Just a bit
+2023-03-26 07:37:32,Sleep,Good
+2023-03-26 07:37:34,Mood,Good
+2023-03-26 07:37:35,Energy,Good
+2023-03-26 07:37:37,Stress,Not much
+2023-03-26 07:37:39,Soreness,Moderate
+2023-03-28 16:32:56,Sleep,Good
+2023-03-28 16:32:57,Mood,Good
+2023-03-28 16:32:59,Energy,Good
+2023-03-28 16:33:00,Stress,Not much
+2023-03-28 16:33:01,Soreness,Just a bit
+2023-03-31 12:45:24,Sleep,Ok
+2023-03-31 12:45:28,Mood,Good
+2023-03-31 12:45:30,Energy,Good
+2023-03-31 12:45:32,Stress,Not much
+2023-03-31 12:45:36,Soreness,Just a bit
+2023-04-04 16:31:11,Sleep,Good
+2023-04-04 16:31:13,Mood,Good
+2023-04-04 16:31:15,Energy,Good
+2023-04-04 16:31:18,Stress,Not much
+2023-04-04 16:31:22,Soreness,Pretty sore
+2023-04-06 06:01:56,Sleep,Ok
+2023-04-06 06:01:58,Mood,Ok
+2023-04-06 06:02:00,Energy,Ok
+2023-04-06 06:02:16,Stress,Ok
+2023-04-06 06:02:17,Soreness,Moderate
+2023-04-09 12:33:33,Sleep,Good
+2023-04-09 12:33:34,Mood,Good
+2023-04-09 12:33:35,Energy,Good
+2023-04-09 12:33:37,Stress,Not much
+2023-04-09 12:33:38,Soreness,Just a bit
+2023-04-11 16:25:22,Sleep,Good
+2023-04-11 16:25:24,Mood,Good
+2023-04-11 16:25:25,Energy,Good
+2023-04-11 16:25:26,Stress,Not much
+2023-04-11 16:25:43,Soreness,Just a bit
+2023-04-13 06:03:35,Sleep,Good
+2023-04-13 06:03:37,Mood,Good
+2023-04-13 06:03:39,Energy,Good
+2023-04-13 06:03:41,Stress,Not much
+2023-04-13 06:03:42,Soreness,Just a bit
+2023-04-18 16:31:17,Sleep,Good
+2023-04-18 16:31:18,Mood,Good
+2023-04-18 16:31:20,Energy,Good
+2023-04-18 16:31:21,Stress,Not much
+2023-04-18 16:31:23,Soreness,Just a bit
+2023-04-20 06:05:42,Sleep,Good
+2023-04-20 06:05:44,Mood,Good
+2023-04-20 06:05:45,Energy,Good
+2023-04-20 06:05:47,Stress,Not much
+2023-04-20 06:05:48,Soreness,Just a bit
+2023-04-25 16:30:32,Sleep,Good
+2023-04-25 16:30:36,Mood,Good
+2023-04-25 16:30:38,Energy,Good
+2023-04-25 16:30:39,Stress,Not much
+2023-04-25 16:30:41,Soreness,Just a bit
+2023-04-27 06:03:25,Sleep,Good
+2023-04-27 06:03:26,Mood,Good
+2023-04-27 06:03:29,Energy,Good
+2023-04-27 06:03:31,Stress,Not much
+2023-04-27 06:03:34,Soreness,Just a bit
+2023-04-30 10:26:03,Sleep,Good
+2023-04-30 10:26:05,Mood,Good
+2023-04-30 10:26:06,Energy,Good
+2023-04-30 10:26:08,Stress,Not much
+2023-04-30 10:26:10,Soreness,Just a bit
+2023-05-02 15:55:47,Sleep,Good
+2023-05-02 15:55:52,Mood,Good
+2023-05-02 15:55:55,Energy,Ok
+2023-05-02 15:55:57,Stress,Ok
+2023-05-02 15:56:00,Soreness,Moderate
+2023-05-04 06:07:07,Sleep,Good
+2023-05-04 06:07:09,Mood,Good
+2023-05-04 06:07:10,Energy,Good
+2023-05-04 06:10:08,Stress,Not much
+2023-05-04 06:10:10,Soreness,Just a bit
+2023-05-13 09:46:07,Sleep,Good
+2023-05-13 09:46:08,Mood,Good
+2023-05-13 09:46:10,Energy,Good
+2023-05-13 09:46:11,Stress,Not much
+2023-05-13 09:46:12,Soreness,Just a bit
+2023-05-13 09:46:59,Sleep,Good
+2023-05-13 09:47:00,Mood,Good
+2023-05-13 09:47:01,Energy,Good
+2023-05-13 09:47:03,Stress,Not much
+2023-05-13 09:47:04,Soreness,Just a bit
+2023-06-13 17:01:11,Sleep,Good
+2023-06-13 17:01:13,Mood,Good
+2023-06-13 17:01:14,Energy,Good
+2023-06-13 17:01:16,Stress,Not much
+2023-06-13 17:01:18,Soreness,Just a bit
+2023-06-15 06:06:09,Sleep,Good
+2023-06-15 06:06:10,Mood,Good
+2023-06-15 06:06:12,Energy,Good
+2023-06-15 06:06:13,Stress,Not much
+2023-06-15 06:06:14,Soreness,Just a bit
+2023-06-20 17:04:47,Sleep,Good
+2023-06-20 17:04:49,Mood,Good
+2023-06-20 17:04:52,Energy,Good
+2023-06-20 17:04:55,Stress,Not much
+2023-06-20 17:04:56,Soreness,Just a bit
+2023-06-23 11:07:24,Sleep,Good
+2023-06-23 11:07:26,Mood,Good
+2023-06-23 11:07:27,Energy,Good
+2023-06-23 11:07:37,Stress,Not much
+2023-06-23 11:23:08,Soreness,Just a bit
+2023-06-27 16:29:28,Sleep,Good
+2023-06-27 16:29:29,Mood,Good
+2023-06-27 16:29:32,Energy,Good
+2023-06-27 16:29:34,Stress,Not much
+2023-06-27 16:29:35,Soreness,Just a bit
+2023-06-30 11:07:40,Sleep,Good
+2023-06-30 11:07:42,Mood,Good
+2023-06-30 11:07:43,Energy,Good
+2023-06-30 11:07:47,Stress,Not much
+2023-06-30 11:07:51,Soreness,Just a bit
+2023-08-06 07:11:44,Sleep,Good
+2023-08-06 07:11:45,Mood,Good
+2023-08-06 07:11:47,Energy,Good
+2023-08-06 07:11:48,Stress,Not much
+2023-08-06 07:11:49,Soreness,Just a bit
+2023-08-27 10:49:05,Sleep,Good
+2023-08-27 10:49:07,Mood,Good
+2023-08-27 10:49:08,Energy,Good
+2023-08-27 10:49:10,Stress,Not much
+2023-08-27 10:49:11,Soreness,Just a bit
+2023-10-24 06:09:50,Sleep,Good
+2023-10-24 06:09:52,Mood,Good
+2023-10-24 06:10:00,Energy,Good
+2023-10-24 06:10:09,Stress,Not much
+2023-10-24 06:21:19,Soreness,Just a bit
+2023-10-26 06:12:26,Sleep,Good
+2023-10-26 06:12:27,Mood,Good
+2023-10-26 06:12:29,Energy,Good
+2023-10-26 06:12:30,Stress,Not much
+2023-10-26 06:12:31,Soreness,Just a bit
+2023-10-31 07:05:03,Sleep,Excellent
+2023-10-31 07:05:05,Mood,Great!
+2023-10-31 07:05:06,Energy,Amped up
+2023-10-31 07:05:08,Stress,Relaxed
+2023-10-31 07:05:09,Soreness,None at all
+2023-11-02 07:26:21,Sleep,Excellent
+2023-11-02 07:26:22,Mood,Good
+2023-11-02 07:26:23,Energy,Good
+2023-11-02 07:26:25,Stress,Not much
+2023-11-02 07:26:26,Soreness,Just a bit
+2023-11-07 07:00:51,Sleep,Excellent
+2023-11-07 07:00:52,Mood,Great!
+2023-11-07 07:00:54,Energy,Amped up
+2023-11-07 07:00:55,Stress,Relaxed
+2023-11-07 07:00:56,Soreness,None at all
+2023-11-09 07:03:18,Sleep,Excellent
+2023-11-09 07:03:19,Mood,Great!
+2023-11-09 07:03:20,Energy,Amped up
+2023-11-09 07:03:22,Stress,Relaxed
+2023-11-09 07:03:23,Soreness,None at all
+2023-11-14 07:06:26,Sleep,Excellent
+2023-11-14 07:06:28,Mood,Great!
+2023-11-14 07:06:29,Energy,Amped up
+2023-11-14 07:06:31,Stress,Relaxed
+2023-11-14 07:06:32,Soreness,None at all
+2023-12-05 07:04:55,Sleep,Good
+2023-12-05 07:04:58,Mood,Good
+2023-12-05 07:05:00,Energy,Good
+2023-12-05 07:05:01,Stress,Not much
+2023-12-05 07:05:03,Soreness,Just a bit
+2023-12-07 07:06:59,Sleep,Good
+2023-12-07 07:07:00,Mood,Good
+2023-12-07 07:07:02,Energy,Good
+2023-12-07 07:07:04,Stress,Not much
+2023-12-07 07:07:05,Soreness,Just a bit
+2023-12-12 07:07:51,Sleep,Good
+2023-12-12 07:07:52,Mood,Good
+2023-12-12 07:07:54,Energy,Good
+2023-12-12 07:07:55,Stress,Not much
+2023-12-12 07:07:56,Soreness,Just a bit
+2023-12-14 06:57:17,Sleep,Good
+2023-12-14 06:57:19,Mood,Good
+2023-12-14 06:57:20,Energy,Good
+2023-12-14 07:04:25,Stress,Not much
+2023-12-14 07:04:26,Soreness,Just a bit
+2023-12-19 06:55:04,Sleep,Ok
+2023-12-19 06:55:08,Mood,Good
+2023-12-19 06:55:11,Energy,Ok
+2023-12-19 06:55:13,Stress,Ok
+2023-12-19 06:55:15,Soreness,Moderate
+2023-12-21 07:02:48,Sleep,Ok
+2023-12-21 07:02:51,Mood,Ok
+2023-12-21 07:02:52,Energy,Ok
+2023-12-21 07:02:53,Stress,Ok
+2023-12-21 07:02:55,Soreness,Moderate
+2024-01-16 07:10:05,Sleep,Good
+2024-01-16 07:10:06,Mood,Good
+2024-01-16 07:10:09,Energy,Good
+2024-01-16 07:10:13,Stress,Not much
+2024-01-16 07:10:17,Soreness,Just a bit
+2024-01-18 07:08:49,Sleep,Good
+2024-01-18 07:08:51,Mood,Good
+2024-01-18 07:08:53,Energy,Good
+2024-01-18 07:09:01,Stress,Not much
+2024-01-18 07:09:16,Soreness,Just a bit
+2024-01-23 07:00:57,Sleep,Good
+2024-01-23 07:00:58,Mood,Good
+2024-01-23 07:01:00,Energy,Good
+2024-01-23 07:01:01,Stress,Not much
+2024-01-23 07:01:02,Soreness,Just a bit
+2024-01-25 07:06:31,Sleep,Good
+2024-01-25 07:06:34,Mood,Good
+2024-01-25 07:06:36,Energy,Good
+2024-01-25 07:06:37,Stress,Not much
+2024-01-25 07:06:38,Soreness,Just a bit
+2024-01-30 07:05:31,Sleep,Good
+2024-01-30 07:05:33,Mood,Good
+2024-01-30 07:05:34,Energy,Good
+2024-01-30 07:05:36,Stress,Not much
+2024-01-30 07:05:37,Soreness,Just a bit
+2024-02-01 07:02:49,Sleep,Good
+2024-02-01 07:02:50,Mood,Good
+2024-02-01 07:02:52,Energy,Good
+2024-02-01 07:02:53,Stress,Not much
+2024-02-01 07:02:55,Soreness,Just a bit
+2024-02-06 06:59:39,Sleep,Good
+2024-02-06 06:59:45,Mood,Good
+2024-02-06 06:59:46,Energy,Good
+2024-02-06 06:59:48,Stress,Not much
+2024-02-06 06:59:50,Soreness,Just a bit
+2024-02-08 07:02:11,Sleep,Good
+2024-02-08 07:02:12,Mood,Good
+2024-02-08 07:02:19,Energy,Good
+2024-02-08 07:02:20,Stress,Not much
+2024-02-08 07:02:23,Soreness,Just a bit
+2024-02-13 07:09:42,Sleep,Good
+2024-02-13 07:09:43,Mood,Good
+2024-02-13 07:09:44,Energy,Good
+2024-02-13 07:09:45,Stress,Not much
+2024-02-13 07:09:47,Soreness,Just a bit
+2024-02-15 07:03:49,Sleep,Good
+2024-02-15 07:03:50,Mood,Good
+2024-02-15 07:03:51,Energy,Good
+2024-02-15 07:03:53,Stress,Not much
+2024-02-15 07:03:55,Soreness,Just a bit
+2024-02-20 06:57:57,Sleep,Good
+2024-02-20 06:57:58,Mood,Good
+2024-02-20 06:57:59,Energy,Good
+2024-02-20 06:58:01,Stress,Not much
+2024-02-20 06:58:02,Soreness,Just a bit
+2024-02-22 07:03:17,Sleep,Good
+2024-02-22 07:03:18,Mood,Good
+2024-02-22 07:03:20,Energy,Good
+2024-02-22 07:03:21,Stress,Not much
+2024-02-22 07:03:23,Soreness,Just a bit
+2024-02-27 07:04:21,Sleep,Good
+2024-02-27 07:04:22,Mood,Good
+2024-02-27 07:04:24,Energy,Good
+2024-02-27 07:04:26,Stress,Not much
+2024-02-27 07:04:27,Soreness,Just a bit
+2024-02-29 07:03:50,Sleep,Good
+2024-02-29 07:03:51,Mood,Good
+2024-02-29 07:03:52,Energy,Good
+2024-02-29 07:03:53,Stress,Not much
+2024-02-29 07:03:55,Soreness,Just a bit
+2024-03-05 07:08:36,Sleep,Good
+2024-03-05 07:08:37,Mood,Good
+2024-03-05 07:08:38,Energy,Good
+2024-03-05 07:08:40,Stress,Not much
+2024-03-05 07:08:41,Soreness,Just a bit
+2024-03-07 07:00:55,Sleep,Good
+2024-03-07 07:00:56,Mood,Good
+2024-03-07 07:00:59,Energy,Good
+2024-03-07 07:01:04,Stress,Not much
+2024-03-07 07:01:08,Soreness,Just a bit
+2024-03-12 07:02:35,Sleep,Good
+2024-03-12 07:02:37,Mood,Good
+2024-03-12 07:02:38,Energy,Good
+2024-03-12 07:02:39,Stress,Not much
+2024-03-12 07:02:41,Soreness,Just a bit
+2024-03-21 06:58:33,Sleep,Good
+2024-03-21 06:58:35,Mood,Good
+2024-03-21 06:58:38,Energy,Good
+2024-03-21 06:58:41,Stress,Not much
+2024-03-21 06:58:45,Soreness,Just a bit
+2024-03-26 07:05:00,Sleep,Good
+2024-03-26 07:05:02,Mood,Good
+2024-03-26 07:05:03,Energy,Good
+2024-03-26 07:05:09,Stress,Not much
+2024-03-26 07:05:13,Soreness,Just a bit
+2024-04-09 06:08:23,Sleep,Good
+2024-04-09 06:08:25,Mood,Good
+2024-04-09 06:08:26,Energy,Good
+2024-04-09 06:08:28,Stress,Not much
+2024-04-09 06:08:29,Soreness,Just a bit
+2024-04-23 06:01:40,Sleep,Ok
+2024-04-23 06:01:42,Mood,Ok
+2024-04-23 06:01:44,Energy,Ok
+2024-04-23 06:01:46,Stress,Ok
+2024-04-23 06:01:48,Soreness,Moderate
+2024-04-25 05:59:05,Sleep,Good
+2024-04-25 05:59:07,Mood,Good
+2024-04-25 05:59:09,Energy,Good
+2024-04-25 05:59:15,Stress,Not much
+2024-04-25 05:59:17,Soreness,Just a bit
+2024-04-30 06:03:47,Sleep,Good
+2024-04-30 06:03:48,Mood,Good
+2024-04-30 06:03:50,Energy,Good
+2024-04-30 06:03:51,Stress,Not much
+2024-04-30 06:03:52,Soreness,Just a bit
+2024-05-02 06:13:36,Sleep,Good
+2024-05-02 06:13:37,Mood,Good
+2024-05-02 06:13:39,Energy,Good
+2024-05-02 06:13:40,Stress,Not much
+2024-05-02 06:13:42,Soreness,Just a bit
+2024-05-07 06:12:49,Sleep,Good
+2024-05-07 06:12:51,Mood,Good
+2024-05-07 06:12:52,Energy,Good
+2024-05-07 06:12:53,Stress,Not much
+2024-05-07 06:12:55,Soreness,Just a bit
+2024-05-09 06:05:47,Sleep,Good
+2024-05-09 06:05:49,Mood,Good
+2024-05-09 06:05:50,Energy,Good
+2024-05-09 06:05:52,Stress,Not much
+2024-05-09 06:05:53,Soreness,Just a bit
+2024-05-21 06:11:24,Sleep,Good
+2024-05-21 06:11:25,Mood,Good
+2024-05-21 06:11:26,Energy,Good
+2024-05-21 06:11:28,Stress,Not much
+2024-05-21 06:11:29,Soreness,Just a bit
+2024-05-23 07:00:59,Sleep,Good
+2024-05-23 07:01:01,Mood,Good
+2024-05-23 07:01:02,Energy,Good
+2024-05-23 07:01:03,Stress,Not much
+2024-05-23 07:01:05,Soreness,Just a bit
+2024-05-28 06:07:21,Sleep,Good
+2024-05-28 06:07:22,Mood,Good
+2024-05-28 06:07:24,Energy,Good
+2024-05-28 06:07:25,Stress,Not much
+2024-05-28 06:07:27,Soreness,Just a bit
+2024-05-30 06:06:07,Sleep,Good
+2024-05-30 06:06:08,Mood,Good
+2024-05-30 06:06:09,Energy,Good
+2024-05-30 06:06:11,Stress,Not much
+2024-05-30 06:06:12,Soreness,Just a bit
+2024-06-04 06:06:32,Sleep,Good
+2024-06-04 06:06:34,Mood,Good
+2024-06-04 06:06:35,Energy,Good
+2024-06-04 06:06:36,Stress,Not much
+2024-06-04 06:06:38,Soreness,Just a bit
+2024-06-06 06:03:24,Sleep,Good
+2024-06-06 06:03:26,Mood,Good
+2024-06-06 06:03:28,Energy,Good
+2024-06-06 06:03:30,Stress,Not much
+2024-06-06 06:03:31,Soreness,Just a bit
+2024-06-11 05:59:59,Sleep,Good
+2024-06-11 06:00:01,Mood,Good
+2024-06-11 06:00:02,Energy,Good
+2024-06-11 06:00:03,Stress,Not much
+2024-06-11 06:00:04,Soreness,Just a bit
+2024-06-18 06:03:46,Sleep,Good
+2024-06-18 06:03:47,Mood,Good
+2024-06-18 06:03:49,Energy,Good
+2024-06-18 06:03:50,Stress,Not much
+2024-06-18 06:03:51,Soreness,Just a bit
+2024-06-25 06:01:42,Sleep,Good
+2024-06-25 06:01:44,Mood,Good
+2024-06-25 06:01:45,Energy,Good
+2024-06-25 06:01:46,Stress,Not much
+2024-06-25 06:01:48,Soreness,Just a bit
+2024-06-27 06:03:25,Sleep,Good
+2024-06-27 06:03:26,Mood,Good
+2024-06-27 06:03:32,Energy,Good
+2024-06-27 06:03:33,Stress,Not much
+2024-06-27 06:03:36,Soreness,Just a bit
+2024-07-02 06:08:00,Sleep,Good
+2024-07-02 06:08:01,Mood,Good
+2024-07-02 06:08:03,Energy,Good
+2024-07-02 06:08:04,Stress,Not much
+2024-07-02 06:08:06,Soreness,Just a bit
+2024-07-04 06:03:50,Sleep,Good
+2024-07-04 06:03:51,Mood,Good
+2024-07-04 06:03:53,Energy,Good
+2024-07-04 06:03:54,Stress,Not much
+2024-07-04 06:03:55,Soreness,Just a bit
+2024-07-09 06:03:18,Sleep,Good
+2024-07-09 06:03:19,Mood,Good
+2024-07-09 06:03:21,Energy,Good
+2024-07-09 06:03:23,Stress,Not much
+2024-07-09 06:03:24,Soreness,Just a bit
+2024-07-11 06:06:29,Sleep,Good
+2024-07-11 06:06:31,Mood,Good
+2024-07-11 06:06:33,Energy,Good
+2024-07-11 06:06:34,Stress,Not much
+2024-07-11 06:06:35,Soreness,Just a bit
+2024-07-23 06:14:35,Sleep,Good
+2024-07-23 06:14:36,Mood,Good
+2024-07-23 06:14:38,Energy,Good
+2024-07-23 06:14:39,Stress,Not much
+2024-07-23 06:14:41,Soreness,Just a bit
+2024-08-01 06:05:58,Sleep,Good
+2024-08-01 06:06:00,Mood,Good
+2024-08-01 06:06:01,Energy,Good
+2024-08-01 06:06:02,Stress,Not much
+2024-08-01 06:06:10,Soreness,Just a bit
+2024-08-06 06:07:37,Sleep,Good
+2024-08-06 06:07:39,Mood,Good
+2024-08-06 06:07:40,Energy,Good
+2024-08-06 06:07:41,Stress,Not much
+2024-08-06 06:07:44,Soreness,Just a bit
+2024-08-15 06:16:38,Sleep,Good
+2024-08-15 06:16:40,Mood,Good
+2024-08-15 06:16:41,Energy,Good
+2024-08-15 06:16:42,Stress,Not much
+2024-08-15 06:16:44,Soreness,Just a bit
+2024-08-20 06:14:06,Sleep,Good
+2024-08-20 06:14:08,Mood,Good
+2024-08-20 06:14:09,Energy,Good
+2024-08-20 06:14:12,Stress,Not much
+2024-08-20 06:14:15,Soreness,Just a bit
+2024-08-22 06:03:47,Sleep,Good
+2024-08-22 06:03:50,Mood,Good
+2024-08-22 06:03:52,Energy,Good
+2024-08-22 06:03:53,Stress,Not much
+2024-08-22 06:03:55,Soreness,Just a bit
+2024-09-19 06:02:21,Sleep,Good
+2024-09-19 06:02:22,Mood,Good
+2024-09-19 06:02:24,Energy,Good
+2024-09-19 06:02:25,Stress,Not much
+2024-09-19 06:02:26,Soreness,Just a bit
+2024-09-24 06:01:43,Sleep,Good
+2024-09-24 06:01:55,Mood,Good
+2024-09-24 06:01:57,Energy,Good
+2024-09-24 06:01:59,Stress,Not much
+2024-09-24 06:02:01,Soreness,Just a bit
+2024-09-26 06:11:28,Sleep,Good
+2024-09-26 06:11:30,Mood,Good
+2024-09-26 06:11:31,Energy,Good
+2024-09-26 06:11:32,Stress,Not much
+2024-09-26 06:11:34,Soreness,Just a bit
+2024-10-01 06:02:19,Sleep,Good
+2024-10-01 06:02:21,Mood,Good
+2024-10-01 06:02:24,Energy,Good
+2024-10-01 06:02:25,Stress,Not much
+2024-10-01 06:02:32,Soreness,Just a bit
+2024-10-08 06:12:55,Sleep,Good
+2024-10-08 06:12:56,Mood,Good
+2024-10-08 06:12:58,Energy,Good
+2024-10-08 06:13:00,Stress,Not much
+2024-10-08 06:13:01,Soreness,Just a bit
+2024-10-15 06:03:17,Sleep,Poor
+2024-10-15 06:03:20,Mood,A little off
+2024-10-15 06:03:21,Energy,Tired
+2024-10-15 06:03:23,Stress,Not much
+2024-10-15 06:03:25,Soreness,Moderate
+2024-10-17 06:07:24,Sleep,Good
+2024-10-17 06:07:26,Mood,Good
+2024-10-17 06:07:28,Energy,Good
+2024-10-17 06:07:29,Stress,Not much
+2024-10-17 06:07:31,Soreness,Just a bit
+2024-10-22 06:10:59,Sleep,Good
+2024-10-22 06:11:01,Mood,Good
+2024-10-22 06:11:02,Energy,Good
+2024-10-22 06:11:03,Stress,Not much
+2024-10-22 06:11:05,Soreness,Just a bit
+2024-10-24 06:01:00,Sleep,Good
+2024-10-24 06:01:01,Mood,Good
+2024-10-24 06:01:03,Energy,Good
+2024-10-24 06:01:10,Stress,Not much
+2024-10-24 06:01:16,Soreness,Just a bit
+2024-10-29 07:03:29,Sleep,Good
+2024-10-29 07:03:31,Mood,Good
+2024-10-29 07:03:32,Energy,Good
+2024-10-29 07:03:33,Stress,Not much
+2024-10-29 07:03:35,Soreness,Just a bit
+2024-10-31 07:06:52,Sleep,Good
+2024-10-31 07:06:53,Mood,Good
+2024-10-31 07:06:55,Energy,Good
+2024-10-31 07:06:56,Stress,Not much
+2024-10-31 07:06:58,Soreness,Just a bit
+2024-11-02 07:43:39,Sleep,Good
+2024-11-02 07:43:41,Mood,Good
+2024-11-02 07:43:42,Energy,Good
+2024-11-02 07:43:43,Stress,Not much
+2024-11-02 07:43:45,Soreness,Just a bit
+2024-11-05 07:02:17,Sleep,Good
+2024-11-05 07:02:18,Mood,Good
+2024-11-05 07:02:19,Energy,Good
+2024-11-05 07:02:21,Stress,Not much
+2024-11-05 07:02:22,Soreness,Just a bit
+2024-11-07 07:12:37,Sleep,Good
+2024-11-07 07:12:40,Mood,Good
+2024-11-07 07:12:42,Energy,Good
+2024-11-07 07:12:44,Stress,Not much
+2024-11-07 07:12:45,Soreness,Just a bit
+2024-11-12 07:09:21,Sleep,Good
+2024-11-12 07:09:22,Mood,Good
+2024-11-12 07:09:24,Energy,Good
+2024-11-12 07:09:26,Stress,Not much
+2024-11-12 07:09:27,Soreness,Just a bit
+2024-11-14 07:03:13,Sleep,Good
+2024-11-14 07:03:15,Mood,Good
+2024-11-14 07:03:16,Energy,Good
+2024-11-14 07:03:17,Stress,Not much
+2024-11-14 07:03:23,Soreness,Just a bit
+2024-11-19 07:01:32,Sleep,Good
+2024-11-19 07:01:33,Mood,Good
+2024-11-19 07:01:37,Energy,Good
+2024-11-19 07:01:38,Stress,Not much
+2024-11-19 07:01:40,Soreness,Just a bit
+2024-11-21 07:02:18,Sleep,Good
+2024-11-21 07:02:20,Mood,Good
+2024-11-21 07:02:21,Energy,Good
+2024-11-21 07:02:22,Stress,Not much
+2024-11-21 07:02:24,Soreness,Just a bit
+2024-12-03 07:03:28,Sleep,Good
+2024-12-03 07:03:30,Mood,Good
+2024-12-03 07:03:31,Energy,Good
+2024-12-03 07:03:32,Stress,Not much
+2024-12-03 07:03:33,Soreness,Just a bit
+2024-12-10 07:09:53,Sleep,Good
+2024-12-10 07:09:55,Mood,Good
+2024-12-10 07:09:56,Energy,Good
+2024-12-10 07:09:57,Stress,Not much
+2024-12-10 07:09:59,Soreness,Just a bit
+2024-12-12 07:03:44,Sleep,Good
+2024-12-12 07:03:45,Mood,Good
+2024-12-12 07:03:47,Energy,Good
+2024-12-12 07:03:48,Stress,Not much
+2024-12-12 07:03:51,Soreness,Just a bit
+2025-01-21 07:12:15,Sleep,Good
+2025-01-21 07:12:17,Mood,Good
+2025-01-21 07:12:18,Energy,Good
+2025-01-21 07:12:20,Stress,Not much
+2025-01-21 07:12:21,Soreness,Just a bit
+2025-01-23 07:10:24,Sleep,Good
+2025-01-23 07:10:25,Mood,Good
+2025-01-23 07:10:26,Energy,Good
+2025-01-23 07:10:28,Stress,Not much
+2025-01-23 07:10:29,Soreness,Just a bit
+2025-01-28 07:01:20,Sleep,Good
+2025-01-28 07:01:22,Mood,Good
+2025-01-28 07:01:23,Energy,Good
+2025-01-28 07:01:24,Stress,Not much
+2025-01-28 07:01:26,Soreness,Just a bit
+2025-01-30 07:09:45,Sleep,Good
+2025-01-30 07:09:46,Mood,Good
+2025-01-30 07:09:48,Energy,Good
+2025-01-30 07:09:49,Stress,Not much
+2025-01-30 07:09:50,Soreness,Just a bit
+2025-02-04 07:00:08,Sleep,Good
+2025-02-04 07:00:10,Mood,Good
+2025-02-04 07:00:13,Energy,Good
+2025-02-04 07:00:15,Stress,Not much
+2025-02-04 07:00:16,Soreness,Just a bit
+2025-02-13 07:01:57,Sleep,Good
+2025-02-13 07:01:58,Mood,Good
+2025-02-13 07:02:00,Energy,Good
+2025-02-13 07:02:01,Stress,Not much
+2025-02-13 07:02:03,Soreness,Just a bit
+2025-02-18 07:00:55,Sleep,Good
+2025-02-18 07:00:59,Mood,Good
+2025-02-18 07:01:01,Energy,Good
+2025-02-18 07:01:02,Stress,Not much
+2025-02-18 07:01:03,Soreness,Just a bit
+2025-02-20 07:01:37,Sleep,Good
+2025-02-20 07:01:39,Mood,Good
+2025-02-20 07:01:40,Energy,Good
+2025-02-20 07:01:41,Stress,Not much
+2025-02-20 07:01:43,Soreness,Just a bit
+2025-02-25 07:01:13,Sleep,Good
+2025-02-25 07:01:16,Mood,Good
+2025-02-25 07:01:18,Energy,Good
+2025-02-25 18:41:10,Stress,Not much
+2025-02-25 18:41:11,Soreness,Just a bit
+2025-03-06 07:00:19,Sleep,Good
+2025-03-06 07:00:31,Mood,Good
+2025-03-06 07:00:33,Energy,Good
+2025-03-06 07:00:39,Stress,Not much
+2025-03-06 07:00:44,Soreness,Just a bit
+2025-03-11 07:12:42,Sleep,Good
+2025-03-11 07:12:44,Mood,Good
+2025-03-11 07:12:45,Energy,Good
+2025-03-11 07:12:48,Soreness,Just a bit
+2025-03-13 07:00:55,Stress,Not much
+2025-03-13 07:00:59,Sleep,Good
+2025-03-13 07:01:00,Mood,Good
+2025-03-13 07:01:02,Energy,Good
+2025-03-13 07:01:03,Stress,Not much
+2025-03-13 07:01:04,Soreness,Just a bit
+2025-04-08 06:03:14,Sleep,Good
+2025-04-08 06:03:16,Mood,Good
+2025-04-08 06:03:17,Energy,Good
+2025-04-08 06:03:19,Stress,Not much
+2025-04-08 06:03:20,Soreness,Just a bit
+2025-04-15 06:08:34,Sleep,Good
+2025-04-15 06:08:36,Mood,Good
+2025-04-15 06:08:37,Energy,Good
+2025-04-15 06:08:38,Stress,Not much
+2025-04-15 06:08:40,Soreness,Just a bit
+2025-04-17 06:18:14,Sleep,Good
+2025-04-17 06:18:15,Mood,Good
+2025-04-17 06:18:17,Energy,Good
+2025-04-17 06:18:19,Stress,Not much
+2025-04-17 06:18:23,Soreness,Just a bit
+2025-04-22 06:00:01,Sleep,Good
+2025-04-22 06:00:06,Mood,Good
+2025-04-22 06:00:09,Energy,Good
+2025-04-22 06:00:11,Stress,Not much
+2025-04-22 06:00:13,Soreness,Just a bit
+2025-04-24 05:59:52,Sleep,Good
+2025-04-24 05:59:55,Mood,Good
+2025-04-24 05:59:57,Energy,Good
+2025-04-24 05:59:59,Stress,Not much
+2025-04-24 06:00:00,Soreness,Just a bit
+2025-04-29 06:00:42,Sleep,Good
+2025-04-29 06:00:43,Mood,Good
+2025-04-29 06:00:45,Energy,Good
+2025-04-29 06:00:46,Stress,Not much
+2025-04-29 06:00:47,Soreness,Just a bit
+2025-05-01 06:18:15,Sleep,Good
+2025-05-01 06:18:16,Mood,Good
+2025-05-01 06:18:17,Energy,Good
+2025-05-01 06:18:19,Stress,Not much
+2025-05-01 06:18:20,Soreness,Just a bit
+2025-05-08 05:59:30,Sleep,Good
+2025-05-08 05:59:31,Mood,Good
+2025-05-08 05:59:32,Energy,Good
+2025-05-08 05:59:34,Stress,Not much
+2025-05-08 05:59:35,Soreness,Just a bit
+2025-05-13 06:08:43,Sleep,Good
+2025-05-13 06:08:44,Mood,Good
+2025-05-13 06:08:46,Energy,Good
+2025-05-13 06:08:48,Stress,Not much
+2025-05-13 06:08:49,Soreness,Just a bit
+2025-05-15 06:15:58,Sleep,Good
+2025-05-15 06:16:00,Mood,Good
+2025-05-15 06:16:01,Energy,Good
+2025-05-15 06:16:03,Stress,Not much
+2025-05-15 06:16:04,Soreness,Just a bit
+2025-05-20 06:04:33,Sleep,Good
+2025-05-20 06:04:34,Mood,Good
+2025-05-20 06:04:36,Energy,Good
+2025-05-20 06:08:46,Stress,Not much
+2025-05-20 06:08:47,Soreness,Just a bit
+2025-05-22 06:01:23,Sleep,Good
+2025-05-22 06:01:24,Mood,Good
+2025-05-22 06:01:26,Energy,Good
+2025-05-22 06:01:27,Stress,Not much
+2025-05-22 06:01:28,Soreness,Just a bit
+2025-05-27 06:07:41,Sleep,Good
+2025-05-27 06:07:42,Mood,Good
+2025-05-27 06:07:44,Energy,Good
+2025-05-27 06:07:45,Stress,Not much
+2025-05-27 06:07:46,Soreness,Just a bit
+2025-05-29 06:10:29,Sleep,Good
+2025-05-29 06:10:30,Mood,Good
+2025-05-29 06:10:31,Energy,Good
+2025-05-29 06:10:32,Stress,Not much
+2025-05-29 06:24:06,Soreness,Just a bit
+2025-06-03 05:58:52,Sleep,Good
+2025-06-03 05:58:53,Mood,Good
+2025-06-03 05:58:56,Energy,Good
+2025-06-03 05:58:58,Stress,Not much
+2025-06-03 05:58:59,Soreness,Just a bit
+2025-06-05 06:13:52,Sleep,Good
+2025-06-05 06:13:53,Mood,Good
+2025-06-05 06:13:55,Energy,Good
+2025-06-05 06:13:56,Stress,Not much
+2025-06-05 06:13:57,Soreness,Just a bit
+2025-06-10 06:13:50,Sleep,Good
+2025-06-10 06:13:51,Mood,Good
+2025-06-10 06:13:52,Energy,Good
+2025-06-10 06:13:53,Stress,Not much
+2025-06-10 06:13:55,Soreness,Just a bit
+2025-06-12 06:01:05,Sleep,Good
+2025-06-12 06:01:06,Mood,Good
+2025-06-12 06:01:08,Energy,Good
+2025-06-12 06:01:09,Stress,Not much
+2025-06-12 06:01:10,Soreness,Just a bit
+2025-06-17 05:57:56,Sleep,Good
+2025-06-17 05:57:57,Mood,Good
+2025-06-17 05:57:59,Energy,Good
+2025-06-17 05:58:00,Stress,Not much
+2025-06-17 05:58:02,Soreness,Just a bit
+2025-06-19 06:01:08,Sleep,Good
+2025-06-19 06:01:10,Mood,Good
+2025-06-19 06:01:12,Energy,Good
+2025-06-19 06:01:13,Stress,Not much
+2025-06-19 06:01:14,Soreness,Just a bit
+2025-06-24 06:10:49,Sleep,Good
+2025-06-24 06:10:50,Mood,Good
+2025-06-24 06:10:51,Energy,Good
+2025-06-24 06:10:53,Stress,Not much
+2025-06-24 06:10:54,Soreness,Just a bit
+2025-06-26 06:00:41,Sleep,Good
+2025-06-26 06:00:43,Mood,Good
+2025-06-26 06:00:44,Energy,Good
+2025-06-26 06:00:45,Stress,Not much
+2025-06-26 06:00:47,Soreness,Just a bit
+2025-07-01 06:00:24,Sleep,Good
+2025-07-01 06:00:25,Mood,Good
+2025-07-01 06:00:27,Energy,Good
+2025-07-01 06:00:29,Stress,Not much
+2025-07-01 06:00:30,Soreness,Just a bit
+2025-07-03 06:02:04,Sleep,Good
+2025-07-03 06:02:05,Mood,Good
+2025-07-03 06:02:07,Energy,Good
+2025-07-03 06:02:08,Stress,Not much
+2025-07-03 06:02:11,Soreness,Just a bit
+2025-07-08 06:07:45,Sleep,Good
+2025-07-08 06:07:46,Mood,Good
+2025-07-08 06:07:47,Energy,Good
+2025-07-08 06:07:49,Stress,Not much
+2025-07-08 06:07:53,Soreness,Just a bit
+2025-07-10 06:12:39,Sleep,Good
+2025-07-10 06:12:41,Mood,Good
+2025-07-10 06:12:42,Energy,Good
+2025-07-10 06:12:43,Stress,Not much
+2025-07-10 06:12:45,Soreness,Just a bit
+2025-07-15 06:12:52,Sleep,Good
+2025-07-15 06:12:53,Mood,Good
+2025-07-15 06:12:54,Energy,Good
+2025-07-15 06:12:56,Stress,Not much
+2025-07-15 06:12:57,Soreness,Just a bit
+2025-07-17 06:13:57,Sleep,Good
+2025-07-17 06:13:58,Mood,Good
+2025-07-17 06:14:00,Energy,Good
+2025-07-17 06:14:02,Stress,Not much
+2025-07-17 06:14:03,Soreness,Just a bit
+2025-07-22 06:00:35,Sleep,Good
+2025-07-22 06:00:37,Mood,Good
+2025-07-22 06:00:38,Energy,Good
+2025-07-22 06:00:44,Stress,Not much
+2025-07-22 06:00:46,Soreness,Just a bit
+2025-07-24 06:27:50,Sleep,Good
+2025-07-24 06:27:54,Mood,Good
+2025-07-24 06:27:56,Energy,Good
+2025-07-24 06:27:57,Stress,Not much
+2025-07-24 06:27:58,Soreness,Just a bit
+2025-07-29 05:59:54,Sleep,Good
+2025-07-29 05:59:56,Mood,Good
+2025-07-29 05:59:57,Energy,Good
+2025-07-29 05:59:58,Stress,Not much
+2025-07-29 06:00:00,Soreness,Just a bit
+2025-07-31 06:11:56,Sleep,Good
+2025-07-31 06:11:57,Mood,Good
+2025-07-31 06:11:59,Energy,Good
+2025-07-31 06:12:00,Stress,Not much
+2025-07-31 06:12:01,Soreness,Just a bit
+2025-08-05 06:12:16,Sleep,Good
+2025-08-05 06:12:18,Mood,Good
+2025-08-05 06:12:19,Energy,Good
+2025-08-05 06:12:20,Stress,Not much
+2025-08-05 06:12:22,Soreness,Just a bit
+2025-08-07 06:12:46,Sleep,Good
+2025-08-07 06:12:47,Mood,Good
+2025-08-07 06:12:50,Energy,Good
+2025-08-07 06:12:52,Stress,Not much
+2025-08-07 06:12:54,Soreness,Just a bit
+2025-08-12 06:16:02,Sleep,Good
+2025-08-12 06:16:03,Mood,Good
+2025-08-12 06:16:05,Energy,Good
+2025-08-12 06:16:06,Stress,Not much
+2025-08-12 06:16:07,Soreness,Just a bit
+2025-08-14 06:09:50,Sleep,Good
+2025-08-14 06:09:51,Mood,Good
+2025-08-14 06:09:52,Energy,Good
+2025-08-14 06:09:53,Stress,Not much
+2025-08-14 06:09:55,Soreness,Just a bit
+2025-08-19 06:18:09,Sleep,Good
+2025-08-19 06:18:11,Mood,Good
+2025-08-19 06:18:13,Energy,Good
+2025-08-19 06:18:14,Stress,Not much
+2025-08-19 06:18:16,Soreness,Just a bit
+2025-08-21 06:00:23,Sleep,Good
+2025-08-21 06:00:25,Mood,Good
+2025-08-21 06:00:27,Energy,Good
+2025-08-21 06:00:28,Stress,Not much
+2025-08-21 06:00:30,Soreness,Just a bit
+2025-09-09 06:06:45,Sleep,Good
+2025-09-09 06:06:47,Mood,Good
+2025-09-09 06:06:49,Energy,Good
+2025-09-09 06:06:51,Stress,Not much
+2025-09-09 06:06:52,Soreness,Just a bit
+2025-09-11 06:00:36,Sleep,Good
+2025-09-11 06:00:37,Mood,Good
+2025-09-11 06:00:38,Energy,Good
+2025-09-11 06:00:40,Stress,Not much
+2025-09-11 06:00:46,Soreness,Just a bit
+2025-09-16 05:59:12,Sleep,Good
+2025-09-16 05:59:14,Mood,Good
+2025-09-16 05:59:15,Energy,Good
+2025-09-16 05:59:16,Stress,Not much
+2025-09-16 05:59:18,Soreness,Just a bit
+2025-09-18 05:58:19,Sleep,Good
+2025-09-18 05:58:21,Mood,Good
+2025-09-18 05:58:24,Energy,Good
+2025-09-18 05:58:26,Stress,Not much
+2025-09-18 05:58:27,Soreness,Just a bit
+2025-09-23 05:54:53,Sleep,Good
+2025-09-23 05:54:56,Mood,Good
+2025-09-23 05:54:58,Energy,Good
+2025-09-23 05:55:01,Stress,Not much
+2025-09-23 05:55:06,Soreness,Just a bit
+2025-09-25 06:02:20,Sleep,Good
+2025-09-25 06:02:22,Mood,Good
+2025-09-25 06:02:23,Energy,Good
+2025-09-25 06:02:25,Stress,Not much
+2025-09-25 06:02:27,Soreness,Just a bit
+2025-10-02 06:01:09,Sleep,Good
+2025-10-02 06:01:11,Mood,Good
+2025-10-02 06:01:13,Energy,Good
+2025-10-02 06:01:15,Stress,Not much
+2025-10-02 06:01:17,Soreness,Just a bit
+2025-10-07 06:06:57,Sleep,Good
+2025-10-07 06:06:58,Mood,Good
+2025-10-07 06:06:59,Energy,Good
+2025-10-07 06:07:01,Stress,Not much
+2025-10-07 06:07:02,Soreness,Just a bit
+2025-10-14 06:23:38,Sleep,Good
+2025-10-14 06:23:40,Mood,Good
+2025-10-14 06:23:42,Energy,Good
+2025-10-14 06:23:43,Stress,Not much
+2025-10-14 06:23:47,Soreness,Just a bit
+2025-10-16 06:28:53,Sleep,Good
+2025-10-16 06:28:55,Mood,Good
+2025-10-16 06:28:56,Energy,Good
+2025-10-16 06:28:57,Stress,Not much
+2025-10-16 06:28:59,Soreness,Just a bit
+2025-10-21 06:00:21,Sleep,Good
+2025-10-21 06:00:22,Mood,Good
+2025-10-21 06:00:24,Energy,Good
+2025-10-21 06:00:25,Stress,Not much
+2025-10-21 06:00:27,Soreness,Just a bit
+2025-10-23 06:02:15,Sleep,Good
+2025-10-23 06:02:17,Mood,Good
+2025-10-23 06:02:18,Energy,Good
+2025-10-23 06:02:19,Stress,Not much
+2025-10-23 06:02:20,Soreness,Just a bit
+2025-10-24 12:44:56,Sleep,Good
+2025-10-24 12:44:58,Mood,Good
+2025-10-24 12:44:59,Energy,Good
+2025-10-24 12:45:00,Stress,Not much
+2025-10-24 12:45:02,Soreness,Just a bit
+2025-10-30 07:01:25,Sleep,Good
+2025-10-30 07:01:26,Mood,Good
+2025-10-30 07:01:28,Energy,Good
+2025-10-30 07:01:29,Stress,Not much
+2025-10-30 07:01:31,Soreness,Just a bit
+2025-11-04 07:00:56,Sleep,Good
+2025-11-04 07:00:57,Mood,Good
+2025-11-04 07:00:59,Energy,Good
+2025-11-04 07:01:00,Stress,Not much
+2025-11-04 07:01:01,Soreness,Just a bit
+2025-11-06 07:11:18,Sleep,Good
+2025-11-06 07:11:19,Mood,Good
+2025-11-06 07:11:21,Energy,Good
+2025-11-06 07:11:22,Stress,Not much
+2025-11-06 07:11:23,Soreness,Just a bit
+2025-11-20 07:01:16,Sleep,Good
+2025-11-20 07:01:17,Mood,Good
+2025-11-20 07:01:18,Energy,Good
+2025-11-20 07:01:20,Stress,Not much
+2025-11-20 07:01:22,Soreness,Just a bit
+2025-11-25 07:24:44,Sleep,Good
+2025-11-25 07:24:46,Mood,Good
+2025-11-25 07:24:47,Energy,Good
+2025-11-25 07:24:58,Stress,Not much
+2025-11-25 07:25:03,Soreness,Just a bit
+2025-11-27 06:59:33,Sleep,Good
+2025-11-27 06:59:34,Mood,Good
+2025-11-27 06:59:37,Energy,Good
+2025-11-27 06:59:38,Stress,Not much
+2025-11-27 06:59:40,Soreness,Just a bit
+2025-12-02 07:02:23,Sleep,Good
+2025-12-02 07:17:32,Mood,Good
+2025-12-02 07:17:33,Energy,Good
+2025-12-02 07:17:35,Stress,Not much
+2025-12-02 07:17:36,Soreness,Just a bit
+2026-01-03 13:04:40,Sleep,Good
+2026-01-03 13:04:40,Mood,Good
+2026-01-03 13:04:42,Energy,Good
+2026-01-03 13:04:43,Stress,Not much
+2026-01-03 13:04:44,Soreness,Just a bit
+2026-01-04 16:21:24,Sleep,Good
+2026-01-04 16:21:25,Mood,Good
+2026-01-04 16:21:27,Energy,Good
+2026-01-04 16:21:28,Stress,Not much
+2026-01-04 16:21:31,Soreness,Just a bit
+2026-01-06 06:57:46,Sleep,Good
+2026-01-06 06:57:48,Mood,Good
+2026-01-06 06:57:57,Energy,Good
+2026-01-06 06:57:58,Stress,Not much
+2026-01-06 06:58:00,Soreness,Just a bit
+2026-01-08 06:59:18,Sleep,Good
+2026-01-08 06:59:19,Mood,Good
+2026-01-08 06:59:21,Energy,Good
+2026-01-08 06:59:26,Stress,Not much
+2026-01-08 06:59:27,Soreness,Just a bit
+2026-01-13 06:59:32,Sleep,Good
+2026-01-13 06:59:34,Mood,Good
+2026-01-13 06:59:35,Energy,Good
+2026-01-13 06:59:36,Stress,Not much
+2026-01-13 06:59:38,Soreness,Just a bit
+2026-01-15 07:00:37,Sleep,Good
+2026-01-15 07:00:38,Mood,Good
+2026-01-15 07:00:40,Energy,Good
+2026-01-15 07:00:41,Stress,Not much
+2026-01-15 07:00:42,Soreness,Just a bit
+2026-01-20 07:00:28,Sleep,Good
+2026-01-20 07:00:29,Mood,Good
+2026-01-20 07:00:30,Energy,Good
+2026-01-20 07:00:32,Stress,Not much
+2026-01-20 07:00:33,Soreness,Just a bit
+2026-01-22 06:59:47,Sleep,Good
+2026-01-22 06:59:49,Mood,Good
+2026-01-22 06:59:50,Energy,Good
+2026-01-22 06:59:51,Stress,Not much
+2026-01-22 06:59:53,Soreness,Just a bit
+2026-01-27 07:15:11,Sleep,Good
+2026-01-27 07:15:12,Mood,Good
+2026-01-27 07:15:13,Energy,Good
+2026-01-27 07:15:13,Stress,Not much
+2026-01-27 07:15:14,Soreness,Just a bit
+2026-01-29 07:15:44,Sleep,Good
+2026-01-29 07:15:45,Mood,Good
+2026-01-29 07:15:46,Energy,Good
+2026-01-29 07:15:47,Stress,Not much
+2026-01-29 07:15:47,Soreness,Just a bit
+2026-02-03 06:59:36,Sleep,Good
+2026-02-03 06:59:37,Mood,Good
+2026-02-03 06:59:38,Energy,Good
+2026-02-03 06:59:39,Stress,Not much
+2026-02-03 06:59:44,Soreness,Just a bit
+2026-02-05 07:06:37,Sleep,Good
+2026-02-05 07:06:38,Mood,Good
+2026-02-05 07:06:38,Energy,Good
+2026-02-05 07:06:39,Stress,Not much
+2026-02-05 07:06:40,Soreness,Just a bit
+2026-02-10 07:11:01,Sleep,Good
+2026-02-10 07:11:01,Mood,Good
+2026-02-10 07:11:03,Energy,Good
+2026-02-10 07:11:03,Stress,Not much
+2026-02-10 07:11:05,Soreness,Just a bit
+2026-02-12 07:10:14,Sleep,Good
+2026-02-12 07:10:15,Mood,Good
+2026-02-12 07:10:16,Energy,Good
+2026-02-12 07:10:19,Stress,Not much
+2026-02-12 07:10:24,Soreness,Just a bit
+2026-02-17 06:55:54,Sleep,Good
+2026-02-17 06:55:56,Mood,Good
+2026-02-17 06:55:57,Energy,Good
+2026-02-17 06:55:58,Stress,Not much
+2026-02-17 06:56:00,Soreness,Just a bit
+2026-02-19 07:07:47,Sleep,Good
+2026-02-19 07:07:48,Mood,Good
+2026-02-19 07:07:49,Energy,Good
+2026-02-19 07:07:50,Stress,Not much
+2026-02-19 07:07:50,Soreness,Just a bit
+2026-02-24 07:00:35,Sleep,Good
+2026-02-24 07:00:36,Mood,Good
+2026-02-24 07:00:36,Energy,Good
+2026-02-24 07:00:37,Stress,Not much
+2026-02-24 07:00:37,Soreness,Just a bit
+2026-02-26 07:08:54,Sleep,Good
+2026-02-26 07:08:55,Mood,Good
+2026-02-26 07:08:55,Energy,Good
+2026-02-26 07:08:56,Stress,Not much
+2026-02-26 07:08:58,Soreness,Just a bit
+2026-03-01 09:29:08,Sleep,Good
+2026-03-01 09:29:08,Mood,Good
+2026-03-01 09:29:08,Energy,Good
+2026-03-01 09:29:09,Stress,Not much
+2026-03-01 09:29:09,Soreness,Just a bit
+2026-03-03 07:09:58,Sleep,Good
+2026-03-03 07:09:58,Mood,Good
+2026-03-03 07:09:59,Energy,Good
+2026-03-03 07:10:00,Stress,Not much
+2026-03-03 07:10:01,Soreness,Just a bit
+2026-03-05 07:09:59,Sleep,Good
+2026-03-05 07:09:59,Mood,Good
+2026-03-05 07:10:00,Energy,Good
+2026-03-05 07:10:01,Stress,Not much
+2026-03-05 07:10:03,Soreness,Just a bit
+2026-03-07 17:47:41,Sleep,Good
+2026-03-07 17:47:42,Mood,Good
+2026-03-07 17:47:42,Energy,Good
+2026-03-07 17:47:43,Stress,Not much
+2026-03-07 17:47:43,Soreness,Just a bit
+2026-03-10 07:12:51,Sleep,Good
+2026-03-10 07:12:52,Mood,Good
+2026-03-10 07:12:53,Stress,Not much
+2026-03-10 07:12:53,Energy,Good
+2026-03-10 07:12:53,Soreness,Just a bit
+2026-03-12 07:08:53,Sleep,Good
+2026-03-12 07:08:53,Mood,Good
+2026-03-12 07:08:54,Energy,Good
+2026-03-12 07:08:54,Stress,Not much
+2026-03-12 07:08:56,Soreness,Just a bit
+2026-03-17 06:58:12,Sleep,Good
+2026-03-17 06:58:12,Mood,Good
+2026-03-17 06:58:13,Energy,Good
+2026-03-17 06:58:13,Stress,Not much
+2026-03-17 06:58:14,Soreness,Just a bit
+2026-03-19 07:15:19,Sleep,Good
+2026-03-19 07:15:19,Mood,Good
+2026-03-19 07:15:20,Energy,Good
+2026-03-19 07:15:21,Stress,Not much
+2026-03-19 07:15:21,Soreness,Just a bit
+2026-03-19 07:24:44,Sleep,Good
+2026-03-19 07:24:44,Mood,Good
+2026-03-19 07:24:45,Energy,Good
+2026-03-19 07:24:46,Stress,Not much
+2026-03-19 07:24:46,Soreness,Just a bit
+2026-04-16 06:01:10,Sleep,Good
+2026-04-16 06:01:10,Mood,Good
+2026-04-16 06:01:11,Energy,Good
+2026-04-16 06:01:11,Stress,Not much
+2026-04-16 06:01:12,Soreness,Just a bit
+2026-04-23 06:11:18,Sleep,Good
+2026-04-23 06:11:18,Mood,Good
+2026-04-23 06:11:19,Energy,Good
+2026-04-23 06:11:20,Stress,Not much
+2026-04-23 06:11:21,Soreness,Just a bit
+2026-04-28 06:07:47,Sleep,Good
+2026-04-28 06:07:48,Mood,Good
+2026-04-28 06:07:48,Energy,Good
+2026-04-28 06:07:49,Stress,Not much
+2026-04-28 06:07:50,Soreness,Just a bit
+2026-04-30 06:07:11,Sleep,Good
+2026-04-30 06:07:12,Mood,Good
+2026-04-30 06:07:12,Energy,Good
+2026-04-30 06:07:13,Stress,Not much
+2026-04-30 06:07:14,Soreness,Just a bit
+2026-05-05 06:01:12,Sleep,Good
+2026-05-05 06:01:12,Mood,Good
+2026-05-05 06:01:14,Energy,Good
+2026-05-05 06:01:14,Stress,Not much
+2026-05-05 06:01:16,Soreness,Just a bit
+2026-05-07 06:09:16,Sleep,Good
+2026-05-07 06:09:16,Mood,Good
+2026-05-07 06:09:17,Energy,Good
+2026-05-07 06:09:18,Stress,Not much
+2026-05-07 06:09:19,Soreness,Just a bit
+2026-05-12 05:58:46,Sleep,Good
+2026-05-12 05:58:47,Mood,Good
+2026-05-12 05:58:48,Energy,Good
+2026-05-12 05:58:48,Stress,Not much
+2026-05-12 05:58:49,Soreness,Just a bit
+2026-05-14 05:59:39,Sleep,Good
+2026-05-14 05:59:40,Mood,Good
+2026-05-14 05:59:41,Energy,Good
+2026-05-14 05:59:41,Stress,Not much
+2026-05-14 05:59:42,Soreness,Just a bit
+2026-05-19 06:17:53,Sleep,Good
+2026-05-19 06:17:53,Mood,Good
+2026-05-19 06:17:54,Energy,Good
+2026-05-19 06:17:55,Stress,Not much
+2026-05-19 06:17:55,Soreness,Just a bit
+2026-05-26 06:15:42,Sleep,Good
+2026-05-26 06:15:42,Mood,Good
+2026-05-26 06:15:43,Energy,Good
+2026-05-26 06:15:44,Stress,Not much
+2026-05-26 06:15:44,Soreness,Just a bit
+2026-05-28 06:02:24,Sleep,Good
+2026-05-28 06:02:24,Mood,Good
+2026-05-28 06:02:25,Energy,Good
+2026-05-28 06:02:26,Stress,Not much
+2026-05-28 06:02:31,Soreness,Just a bit
+2026-06-02 06:07:31,Sleep,Good
+2026-06-02 06:07:31,Mood,Good
+2026-06-02 06:07:32,Energy,Good
+2026-06-02 06:07:33,Stress,Not much
+2026-06-02 06:07:33,Soreness,Just a bit
+2026-06-11 05:59:38,Sleep,Good
+2026-06-11 05:59:43,Mood,Good
+2026-06-11 05:59:45,Energy,Good
+2026-06-11 05:59:46,Stress,Not much
+2026-06-11 05:59:46,Soreness,Just a bit
+2026-06-16 06:05:26,Sleep,Good
+2026-06-16 06:05:27,Mood,Good
+2026-06-16 06:05:28,Energy,Good
+2026-06-16 06:05:28,Stress,Not much
+2026-06-16 06:05:29,Soreness,Just a bit
+2026-06-18 06:15:04,Sleep,Good
+2026-06-18 06:15:04,Mood,Good
+2026-06-18 06:15:05,Energy,Good
+2026-06-18 06:15:05,Stress,Not much
+2026-06-18 06:15:06,Soreness,Just a bit
+2026-06-23 06:02:18,Sleep,Good
+2026-06-23 06:02:18,Mood,Good
+2026-06-23 06:02:19,Energy,Good
+2026-06-23 06:02:20,Stress,Not much
+2026-06-23 06:02:20,Soreness,Just a bit
+2026-06-25 06:01:44,Sleep,Good
+2026-06-25 06:01:45,Mood,Good
+2026-06-25 06:01:45,Energy,Good
+2026-06-25 06:01:46,Stress,Not much
+2026-06-25 06:01:47,Soreness,Just a bit
+2026-07-07 06:00:17,Sleep,Good
+2026-07-07 06:00:18,Mood,Good
+2026-07-07 06:00:19,Energy,Good
+2026-07-07 06:00:20,Stress,Not much
+2026-07-07 06:00:21,Soreness,Just a bit

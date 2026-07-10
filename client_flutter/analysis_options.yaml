@@ -1,0 +1,11 @@
+analyzer:
+  exclude:
+    - build/**
+
+linter:
+  rules:
+    avoid_print: true
+    prefer_const_constructors: true
+    prefer_final_fields: true
+    prefer_final_locals: true
+

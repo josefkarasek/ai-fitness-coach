@@ -84,6 +84,8 @@ Responsibilities:
 - Summarize training history compactly
 - Provide allowed movement patterns, constraints, and progression guardrails
 - Request structured outputs for coaching books and block reviews
+- Trigger only bounded backend-owned AI actions
+- Cache generated outputs so repeat views do not re-spend tokens
 
 The engine should shape the AI task rather than asking the AI to infer
 everything from raw logs.
@@ -106,7 +108,7 @@ Example API areas:
 - Workouts
 - Workout logs
 - Statistics
-- AI actions
+- AI actions such as `POST /workouts/:id/explanation`
 
 ## Suggested Package Shape
 
@@ -139,6 +141,7 @@ Initial storage should cover:
 - Workout logs
 - Import jobs
 - AI generation jobs
+- AI-generated workout explanations
 
 ## Design Rules
 

@@ -1,0 +1,25 @@
+# Flutter/Dart/Pub
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+.packages
+.pub/
+.pub-cache/
+build/
+
+# IDE
+.idea/
+.vscode/
+
+# Platform-specific generated files
+android/.gradle/
+android/app/debug
+android/app/profile
+android/app/release
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.podspec
+macos/Pods/
+macos/Flutter/Flutter.podspec
+

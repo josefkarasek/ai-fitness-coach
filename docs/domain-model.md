@@ -32,6 +32,7 @@
 -   week
 -   day
 -   exercises
+-   workout explanation
 
 ## Exercise
 
@@ -47,3 +48,4 @@
 -   weight
 -   RPE
 -   notes
+-   generated coaching commentary

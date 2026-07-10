@@ -1,0 +1,56 @@
+package router
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/josefkarasek/ai-fitness-coach/backend/internal/http/handlers"
+	"github.com/josefkarasek/ai-fitness-coach/backend/internal/http/middleware"
+)
+
+func New(
+	healthHandler *handlers.HealthHandler,
+	authHandler *handlers.AuthHandler,
+	importHandler *handlers.ImportHandler,
+	workoutsHandler *handlers.WorkoutsHandler,
+	workoutLogsHandler *handlers.WorkoutLogsHandler,
+	workoutExplanationHandler *handlers.WorkoutExplanationHandler,
+	trainingPlansHandler *handlers.TrainingPlansHandler,
+	authentication *middleware.Authentication,
+) *gin.Engine {
+	r := gin.New()
+	r.Use(gin.Logger(), gin.Recovery())
+
+	v1 := r.Group("/api/v1")
+	{
+		v1.GET("/health/live", healthHandler.Liveness)
+		v1.GET("/health/ready", healthHandler.Readiness)
+	}
+
+	if authentication != nil && authHandler != nil {
+		protected := v1.Group("")
+		protected.Use(authentication.RequireAuth())
+		protected.GET("/me", authHandler.Me)
+		if workoutsHandler != nil {
+			protected.GET("/workouts", workoutsHandler.List)
+			if workoutExplanationHandler != nil {
+				protected.POST("/workouts/:id/explanation", workoutExplanationHandler.Create)
+			}
+		}
+		if workoutLogsHandler != nil {
+			protected.GET("/workout-logs", workoutLogsHandler.List)
+			protected.POST("/workout-logs", workoutLogsHandler.Create)
+		}
+		if importHandler != nil {
+			protected.POST("/imports", importHandler.Create)
+		}
+		if trainingPlansHandler != nil {
+			protected.POST("/training-plans", trainingPlansHandler.Create)
+			protected.GET("/training-plans/latest", trainingPlansHandler.Latest)
+			protected.POST("/training-plans/:id/weekly-preview", trainingPlansHandler.GenerateWeeklyPreview)
+			protected.POST("/training-plans/:id/generate-day", trainingPlansHandler.GenerateDay)
+			protected.POST("/training-plans/:id/move-workout", trainingPlansHandler.MoveWorkout)
+			protected.POST("/training-plans/:id/skip-workout", trainingPlansHandler.SkipWorkout)
+		}
+	}
+
+	return r
+}

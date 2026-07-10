@@ -28,12 +28,24 @@ Recommended client stack:
 - Local SQLite cache
 - REST client for Go service
 
+Client-side storage should be split into three buckets:
+
+- Device only: UI and device preferences such as theme, measurement
+  system, onboarding completion, and the last signed-in user
+- Device cache plus sync queue: Drift-backed local cache for user
+  profile snapshots, generated training plans, workout logs, and
+  pending offline writes that need to be replayed later
+- Backend source of truth: the Go service remains authoritative for
+  persisted athlete data, imported history, training blocks, and synced
+  workout logs
+
 ## Layer 2: Training Engine
 
 Responsibilities:
 
 - Domain model for athlete, block, workout, exercise, and logs
 - TrainHeroic import and normalization
+- Persist performed workout logs separately from imported historical workouts
 - Movement patterns and exercise catalog
 - Progression models
 - Volume calculations
@@ -58,13 +70,21 @@ Responsibilities:
 
 - Generate 12-week coaching books
 - Generate training blocks from structured inputs
-- Explain exercise choices
+- Explain exercise choices and completed workouts
 - Review completed blocks
 - Suggest adjustments for the next block
 
 The AI Coach should operate on structured inputs prepared by the
 Training Engine and produce structured outputs that can be stored,
 reviewed, and rendered later.
+
+The mobile client should not expose an open-ended chat box that can
+directly consume model tokens. Instead, the backend should own bounded
+AI actions such as:
+
+- Generate a new coaching book
+- Explain a logged workout
+- Review a completed block
 
 ## Boundaries
 
@@ -75,6 +95,8 @@ The Training Engine is responsible for deterministic calculations.
 The Mobile UI is responsible for presentation and input.
 
 Business rules should not be embedded in Flutter widgets.
+Prompt construction, model selection, token limits, and caching should
+also stay in the backend.
 
 ## Offline-first
 

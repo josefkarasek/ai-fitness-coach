@@ -2,6 +2,9 @@
 
 ## Goal
 
+LiftsForge is an AI strength coach that writes coaching books, not
+workout lists.
+
 Create an AI strength coach that understands years of training history
 and produces personalized long-term training plans.
 

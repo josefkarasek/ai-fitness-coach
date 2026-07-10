@@ -3,6 +3,11 @@
 The AI layer should only receive structured inputs produced by the Go
 training engine.
 
+The app client should never be allowed to submit arbitrary prompts
+directly to the model provider. Every AI call should come from a
+backend-owned workflow with explicit limits, persistence, and audit
+data.
+
 ## Generate Coaching Book
 
 Inputs: - Athlete profile - Training history summary - Goal - Available
@@ -19,6 +24,23 @@ Why is this exercise included? How does it contribute to the block? Why
 this variation instead of another?
 
 These explanations are generated once and stored.
+
+## Logged Workout Explanation
+
+Inputs:
+
+- Workout structure
+- Exercise sequence
+- Set and load data
+- Workout notes
+- Block instructions and notes
+
+Outputs:
+
+- Concise explanation of session intent
+- Why the exercise sequence makes sense
+- What the loading or rep scheme suggests
+- Follow-up coaching observations grounded in the logged data
 
 ## Review Completed Block
 

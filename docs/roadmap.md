@@ -10,11 +10,12 @@
 ## MVP
 
 -   TrainHeroic import
--   Athlete profile
+-   Firebase-authenticated athlete profile
 -   Go training engine
--   SQLite persistence
+-   PostgreSQL persistence for backend service
 -   Statistics
 -   AI prompt generation
+-   Persisted workout explanations
 -   12-week block generation
 -   Coaching Book
 -   Exercise explanations
