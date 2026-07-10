@@ -1,6 +1,9 @@
 package auth
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 type Identity struct {
 	FirebaseUID string
@@ -16,7 +19,11 @@ type User struct {
 	TrainingExperience string   `json:"training_experience,omitempty"`
 	PrimaryGoal        string   `json:"primary_goal,omitempty"`
 	PreferredDays      []string `json:"preferred_days,omitempty"`
+	RedeemedPromoCode  string   `json:"redeemed_promo_code,omitempty"`
+	AIAccessEnabled    bool     `json:"ai_access_enabled"`
 }
+
+var ErrPromoCodeNotFound = errors.New("promo code not found")
 
 type Verifier interface {
 	VerifyToken(ctx context.Context, token string) (Identity, error)

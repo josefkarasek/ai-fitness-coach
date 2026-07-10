@@ -9,6 +9,7 @@ import (
 func New(
 	healthHandler *handlers.HealthHandler,
 	authHandler *handlers.AuthHandler,
+	promoCodeHandler *handlers.PromoCodeHandler,
 	importHandler *handlers.ImportHandler,
 	workoutsHandler *handlers.WorkoutsHandler,
 	workoutLogsHandler *handlers.WorkoutLogsHandler,
@@ -29,6 +30,9 @@ func New(
 		protected := v1.Group("")
 		protected.Use(authentication.RequireAuth())
 		protected.GET("/me", authHandler.Me)
+		if promoCodeHandler != nil {
+			protected.POST("/promo-codes/redeem", promoCodeHandler.Redeem)
+		}
 		if workoutsHandler != nil {
 			protected.GET("/workouts", workoutsHandler.List)
 			if workoutExplanationHandler != nil {

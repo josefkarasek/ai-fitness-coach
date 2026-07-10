@@ -84,15 +84,23 @@ type WorkoutLogReviewResult struct {
 
 type WorkoutLogReviewerService struct {
 	store      WorkoutLogReviewStore
-	reviewer   ai.WorkoutLogReviewer
+	access     AIAccessStore
+	freeAI     ai.WorkoutLogReviewer
+	paidAI     ai.WorkoutLogReviewer
 	dailyLimit int
 	now        func() time.Time
 }
 
 func NewWorkoutLogReviewerService(store WorkoutLogReviewStore, reviewer ai.WorkoutLogReviewer, dailyLimit int) *WorkoutLogReviewerService {
+	return NewWorkoutLogReviewerServiceWithAccessControl(store, nil, reviewer, reviewer, dailyLimit)
+}
+
+func NewWorkoutLogReviewerServiceWithAccessControl(store WorkoutLogReviewStore, access AIAccessStore, freeAI ai.WorkoutLogReviewer, paidAI ai.WorkoutLogReviewer, dailyLimit int) *WorkoutLogReviewerService {
 	return &WorkoutLogReviewerService{
 		store:      store,
-		reviewer:   reviewer,
+		access:     access,
+		freeAI:     freeAI,
+		paidAI:     paidAI,
 		dailyLimit: dailyLimit,
 		now:        time.Now,
 	}
@@ -135,7 +143,12 @@ func (s *WorkoutLogReviewerService) ReviewWorkoutLog(ctx context.Context, user a
 		return WorkoutLogReviewResult{}, ErrWorkoutLogNotFound
 	}
 
-	generated, err := s.reviewer.ReviewWorkoutLog(ctx, buildWorkoutReviewContext(plannedWorkout, workoutLog))
+	reviewer, err := s.reviewerForUser(ctx, user)
+	if err != nil {
+		return WorkoutLogReviewResult{}, err
+	}
+
+	generated, err := reviewer.ReviewWorkoutLog(ctx, buildWorkoutReviewContext(plannedWorkout, workoutLog))
 	if err != nil {
 		return WorkoutLogReviewResult{}, fmt.Errorf("generate workout log review: %w", err)
 	}
@@ -146,6 +159,22 @@ func (s *WorkoutLogReviewerService) ReviewWorkoutLog(ctx context.Context, user a
 	}
 
 	return buildWorkoutLogReviewResult(stored, true, s.dailyLimit, generatedToday+1), nil
+}
+
+func (s *WorkoutLogReviewerService) reviewerForUser(ctx context.Context, user auth.User) (ai.WorkoutLogReviewer, error) {
+	if s.access == nil {
+		return s.paidAI, nil
+	}
+
+	enabled, err := s.access.HasPaidAIAccessForUser(ctx, user)
+	if err != nil {
+		return nil, fmt.Errorf("check ai access: %w", err)
+	}
+	if enabled {
+		return s.paidAI, nil
+	}
+
+	return s.freeAI, nil
 }
 
 func (s *WorkoutLogReviewerService) countGeneratedToday(ctx context.Context, user auth.User) (int, error) {

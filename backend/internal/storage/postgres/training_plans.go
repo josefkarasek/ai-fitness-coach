@@ -351,7 +351,7 @@ func (s *TrainingPlanStore) getTrainingPlan(ctx context.Context, user auth.User,
 		return coaching.StoredTrainingPlan{}, false, fmt.Errorf("query latest training plan: %w", err)
 	}
 
-	weeksByNumber := make(map[int]*coaching.StoredTrainingPlanWeek)
+	weekIndexesByNumber := make(map[int]int)
 	weekRows, err := s.db.Query(ctx, `
 		select week_number, theme
 		from training_plan_weeks
@@ -369,7 +369,7 @@ func (s *TrainingPlanStore) getTrainingPlan(ctx context.Context, user auth.User,
 			return coaching.StoredTrainingPlan{}, false, fmt.Errorf("scan training plan week: %w", err)
 		}
 		stored.Weeks = append(stored.Weeks, week)
-		weeksByNumber[week.WeekNumber] = &stored.Weeks[len(stored.Weeks)-1]
+		weekIndexesByNumber[week.WeekNumber] = len(stored.Weeks) - 1
 	}
 	if err := weekRows.Err(); err != nil {
 		return coaching.StoredTrainingPlan{}, false, fmt.Errorf("iterate training plan weeks: %w", err)
@@ -406,11 +406,11 @@ func (s *TrainingPlanStore) getTrainingPlan(ctx context.Context, user auth.User,
 			}
 		}
 
-		week := weeksByNumber[weekNumber]
-		if week == nil {
+		weekIndex, ok := weekIndexesByNumber[weekNumber]
+		if !ok {
 			continue
 		}
-		week.Workouts = append(week.Workouts, workout)
+		stored.Weeks[weekIndex].Workouts = append(stored.Weeks[weekIndex].Workouts, workout)
 	}
 	if err := workoutRows.Err(); err != nil {
 		return coaching.StoredTrainingPlan{}, false, fmt.Errorf("iterate training plan workouts: %w", err)

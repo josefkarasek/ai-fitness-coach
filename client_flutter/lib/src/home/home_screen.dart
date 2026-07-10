@@ -51,12 +51,18 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _promoCodeController = TextEditingController();
   final TextEditingController _meUrlController = TextEditingController(
     text: '$_backendBaseUrl/api/v1/me',
+  );
+  final TextEditingController _promoCodesRedeemUrlController =
+      TextEditingController(
+    text: '$_backendBaseUrl/api/v1/promo-codes/redeem',
   );
   final TextEditingController _importsUrlController = TextEditingController(
     text: '$_backendBaseUrl/api/v1/imports',
@@ -116,14 +122,32 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _selectedWeekday;
   _TrainingPlanResult? _latestTrainingPlan;
   _WeeklyCoachingPreview? _weeklyCoachingPreview;
+  Map<String, _WorkoutSessionDraftSummary> _workoutSessionDraftsByKey =
+      <String, _WorkoutSessionDraftSummary>{};
   String _deviceMeasurementSystem = _measurementSystemMetric;
+  int? _viewedWeekNumber;
   int? _activeDisplayedWeekNumber;
   int? _activeDisplayedWeekPlanID;
+  double _weekStripDragDistance = 0;
+  double _weekStripOffset = 0;
+  late final AnimationController _weekStripAnimationController;
+  Animation<double>? _weekStripOffsetAnimation;
   StreamSubscription<User?>? _authStateSubscription;
 
   @override
   void initState() {
     super.initState();
+    _weekStripAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    )..addListener(() {
+        if (!mounted || _weekStripOffsetAnimation == null) {
+          return;
+        }
+        setState(() {
+          _weekStripOffset = _weekStripOffsetAnimation!.value;
+        });
+      });
     _deviceMeasurementSystem = widget.preferences.measurementSystem;
     _authStateSubscription =
         _auth.authStateChanges().listen(_handleAuthStateChanged);
@@ -133,9 +157,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _authStateSubscription?.cancel();
+    _weekStripAnimationController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _promoCodeController.dispose();
     _meUrlController.dispose();
+    _promoCodesRedeemUrlController.dispose();
     _importsUrlController.dispose();
     _workoutsUrlController.dispose();
     _workoutLogsUrlController.dispose();
@@ -173,8 +200,11 @@ class _HomeScreenState extends State<HomeScreen> {
         _selectedWeekday = null;
         _latestTrainingPlan = null;
         _weeklyCoachingPreview = null;
+        _workoutSessionDraftsByKey = <String, _WorkoutSessionDraftSummary>{};
+        _viewedWeekNumber = null;
         _activeDisplayedWeekNumber = null;
         _activeDisplayedWeekPlanID = null;
+        _weekStripOffset = 0;
       });
       return;
     }
@@ -219,6 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _latestTrainingPlan = null;
           _weeklyCoachingPreview = null;
+          _viewedWeekNumber = null;
           _activeDisplayedWeekNumber = null;
           _activeDisplayedWeekPlanID = null;
         });
@@ -249,6 +280,12 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
       await _loadWorkoutLogsForPlan(token, plan.planID, announceStatus: false);
+      if (currentUser != null) {
+        await _refreshCachedWorkoutSessionDraftsForPlan(
+          firebaseUid: currentUser.uid,
+          trainingPlanID: plan.planID,
+        );
+      }
       await _syncDisplayedWeekForCurrentPlan();
       await _maybeLoadWeeklyCoachingPreview(token, plan);
     } on _UiException {
@@ -290,6 +327,21 @@ class _HomeScreenState extends State<HomeScreen> {
       workoutLogs = _mergeQueuedWorkoutLogs(workoutLogs, queuedWorkoutLogs);
     }
 
+    final Map<String, _WorkoutSessionDraftSummary> workoutSessionDraftsByKey =
+        trainingPlan == null
+            ? <String, _WorkoutSessionDraftSummary>{}
+            : await _loadCachedWorkoutSessionDraftsForPlan(
+                firebaseUid: user.uid,
+                trainingPlanID: trainingPlan.planID,
+              );
+    final _WeeklyCoachingPreview? cachedWeeklyPreview = trainingPlan == null
+        ? null
+        : _loadCachedWeeklyCoachingPreview(
+            firebaseUid: user.uid,
+            plan: trainingPlan,
+            workoutLogs: workoutLogs,
+          );
+
     if (!mounted) {
       return;
     }
@@ -304,6 +356,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (workoutLogs.isNotEmpty) {
         _workoutLogs = workoutLogs;
       }
+      _workoutSessionDraftsByKey = workoutSessionDraftsByKey;
+      _weeklyCoachingPreview = cachedWeeklyPreview;
     });
 
     await _syncDisplayedWeekForCurrentPlan();
@@ -346,6 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: _AuthOnboardingScreen(
           emailController: _emailController,
           passwordController: _passwordController,
+          promoCodeController: _promoCodeController,
           busy: _busy,
           status: _status,
           onCreateAccount: _signUp,
@@ -392,24 +447,44 @@ class _HomeScreenState extends State<HomeScreen> {
         _workoutLogsForPlan(plan?.planID);
     final int completedWorkouts = workoutLogsForPlan.length;
     final int currentWeekNumber = _currentWeekNumber(plan, workoutLogsForPlan);
+    final int displayedWeekNumber =
+        _displayedWeekNumber(plan, currentWeekNumber);
     final _UpcomingWorkoutData? upcomingWorkout =
-        _upcomingWorkout(plan, workoutLogsForPlan, currentWeekNumber);
+        _upcomingWorkout(plan, workoutLogsForPlan, displayedWeekNumber);
     final _TrainingPlanWeek? currentWeek =
-        _currentWeek(plan, currentWeekNumber);
+        _currentWeek(plan, displayedWeekNumber);
     final double blockProgress = _blockProgress(plan, completedWorkouts);
     final String athleteName = _athleteName(user, _backendUser);
     final _WeeklyTrainingStats weeklyStats = _weeklyTrainingStats(
       workoutLogsForPlan,
       currentWeek,
-      currentWeekNumber,
+      displayedWeekNumber,
     );
     final List<_WeekdayWorkoutSlot> currentWeekSlots = _currentWeekSlots(
       currentWeek,
       workoutLogsForPlan
-          .where((_WorkoutLogItem item) => item.weekNumber == currentWeekNumber)
+          .where(
+              (_WorkoutLogItem item) => item.weekNumber == displayedWeekNumber)
           .toList(growable: false),
       _backendUser?.preferredDays ?? const <String>[],
     );
+    final List<_WeekdayWorkoutSlot>? previousWeekSlots = displayedWeekNumber > 1
+        ? _weekSlotsForWeek(
+            plan,
+            workoutLogsForPlan,
+            displayedWeekNumber - 1,
+            _backendUser?.preferredDays ?? const <String>[],
+          )
+        : null;
+    final List<_WeekdayWorkoutSlot>? nextWeekSlots =
+        plan != null && displayedWeekNumber < plan.durationWeeks
+            ? _weekSlotsForWeek(
+                plan,
+                workoutLogsForPlan,
+                displayedWeekNumber + 1,
+                _backendUser?.preferredDays ?? const <String>[],
+              )
+            : null;
     final _WeekdayWorkoutSlot? selectedWeekSlot =
         _selectedWeekSlot(currentWeekSlots);
 
@@ -432,7 +507,7 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 _WeeklyProgressStrip(
-                  currentWeekNumber: currentWeekNumber,
+                  currentWeekNumber: displayedWeekNumber,
                   blockProgress: blockProgress,
                   totalReps: weeklyStats.totalReps,
                   targetReps: weeklyStats.targetReps,
@@ -442,24 +517,124 @@ class _HomeScreenState extends State<HomeScreen> {
                   volumeProgress: weeklyStats.volumeProgress,
                 ),
                 const SizedBox(height: 12),
-                _WeekdayWorkoutStrip(
-                  slots: currentWeekSlots,
-                  selectedWeekday: selectedWeekSlot?.weekdayLabel,
-                  currentWeekday: _currentWeekdayLabel(),
-                  onTap: (String weekday) {
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onHorizontalDragStart: (_) {
+                    _weekStripAnimationController.stop();
+                    _weekStripOffsetAnimation = null;
+                    _weekStripDragDistance = 0;
+                  },
+                  onHorizontalDragUpdate: (DragUpdateDetails details) {
+                    final double delta = details.primaryDelta ?? 0;
+                    _weekStripDragDistance += delta;
                     setState(() {
-                      _selectedWeekday = weekday;
+                      _weekStripOffset += delta;
                     });
                   },
-                  onLongPress: (_WeekdayWorkoutSlot slot) =>
-                      _handleWeekdayLongPress(slot, currentWeekNumber),
+                  onHorizontalDragEnd: (DragEndDetails details) {
+                    final double velocity = details.primaryVelocity ?? 0;
+                    final double distance = _weekStripDragDistance;
+                    _weekStripDragDistance = 0;
+                    _handleWeekStripDragEnd(
+                      plan: plan,
+                      fallbackWeekNumber: currentWeekNumber,
+                      viewportWidth: MediaQuery.sizeOf(context).width - 40,
+                      velocity: velocity,
+                      distance: distance,
+                    );
+                  },
+                  onHorizontalDragCancel: () {
+                    _weekStripDragDistance = 0;
+                    _animateWeekStripBack();
+                  },
+                  child: LayoutBuilder(
+                    builder:
+                        (BuildContext context, BoxConstraints constraints) {
+                      final double width = constraints.maxWidth;
+
+                      return ClipRect(
+                        child: SizedBox(
+                          height: 64,
+                          child: Stack(
+                            children: <Widget>[
+                              if (previousWeekSlots != null)
+                                Transform.translate(
+                                  offset: Offset(
+                                    _weekStripOffset - width,
+                                    0,
+                                  ),
+                                  child: _WeekdayWorkoutStrip(
+                                    slots: previousWeekSlots,
+                                    selectedWeekday:
+                                        selectedWeekSlot?.weekdayLabel,
+                                    currentWeekday: _currentWeekdayLabel(),
+                                    onTap: (String weekday) {
+                                      setState(() {
+                                        _selectedWeekday = weekday;
+                                      });
+                                    },
+                                    onLongPress: (_WeekdayWorkoutSlot slot) =>
+                                        _handleWeekdayLongPress(
+                                      slot,
+                                      displayedWeekNumber - 1,
+                                    ),
+                                  ),
+                                ),
+                              Transform.translate(
+                                offset: Offset(_weekStripOffset, 0),
+                                child: _WeekdayWorkoutStrip(
+                                  slots: currentWeekSlots,
+                                  selectedWeekday:
+                                      selectedWeekSlot?.weekdayLabel,
+                                  currentWeekday: _currentWeekdayLabel(),
+                                  onTap: (String weekday) {
+                                    setState(() {
+                                      _selectedWeekday = weekday;
+                                    });
+                                  },
+                                  onLongPress: (_WeekdayWorkoutSlot slot) =>
+                                      _handleWeekdayLongPress(
+                                    slot,
+                                    displayedWeekNumber,
+                                  ),
+                                ),
+                              ),
+                              if (nextWeekSlots != null)
+                                Transform.translate(
+                                  offset: Offset(
+                                    _weekStripOffset + width,
+                                    0,
+                                  ),
+                                  child: _WeekdayWorkoutStrip(
+                                    slots: nextWeekSlots,
+                                    selectedWeekday:
+                                        selectedWeekSlot?.weekdayLabel,
+                                    currentWeekday: _currentWeekdayLabel(),
+                                    onTap: (String weekday) {
+                                      setState(() {
+                                        _selectedWeekday = weekday;
+                                      });
+                                    },
+                                    onLongPress: (_WeekdayWorkoutSlot slot) =>
+                                        _handleWeekdayLongPress(
+                                      slot,
+                                      displayedWeekNumber + 1,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
                 if (selectedWeekSlot != null &&
                     (selectedWeekSlot.hasWorkout ||
                         selectedWeekSlot.loggedWorkout != null)) ...<Widget>[
                   const SizedBox(height: 12),
                   _WorkoutDayDetailCard(
-                    currentWeekNumber: currentWeekNumber,
+                    currentWeekNumber: displayedWeekNumber,
                     totalWeeks: plan?.durationWeeks ?? 12,
                     slot: selectedWeekSlot,
                     onStart: selectedWeekSlot.workout == null || plan == null
@@ -471,7 +646,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 relativeLabel: selectedWeekSlot.isCurrentDay
                                     ? 'Today'
                                     : 'Scheduled',
-                                weekNumber: currentWeekNumber,
+                                weekNumber: displayedWeekNumber,
                                 dayNumber: selectedWeekSlot.workout!.dayNumber,
                                 title: selectedWeekSlot.workout!.title,
                                 focus: selectedWeekSlot.workout!.focus,
@@ -490,10 +665,39 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                   ),
                 ],
+                if (DateTime.now().weekday == DateTime.monday &&
+                    plan != null) ...<Widget>[
+                  const SizedBox(height: 18),
+                  _WeeklyMondayBriefingCard(
+                    currentWeekNumber: displayedWeekNumber,
+                    totalWeeks: plan.durationWeeks,
+                    phaseLabel: currentWeek?.theme.isNotEmpty == true
+                        ? currentWeek!.theme
+                        : 'Current phase',
+                    weeklyPreview: _weeklyCoachingPreview,
+                    nextMilestoneTitle: _nextMilestoneTitle(
+                      plan,
+                      displayedWeekNumber,
+                    ),
+                    nextMilestoneBody: _nextMilestoneBody(
+                      plan,
+                      displayedWeekNumber,
+                      _weeklyCoachingPreview,
+                    ),
+                    onReadCoachingBook: () => _showCoachingBookSheet(
+                      context,
+                      plan,
+                      athleteName,
+                      currentWeek,
+                      displayedWeekNumber,
+                      _weeklyCoachingPreview,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 _CoachBriefingCard(
                   athleteName: athleteName,
-                  currentWeekNumber: currentWeekNumber,
+                  currentWeekNumber: displayedWeekNumber,
                   totalWeeks: plan?.durationWeeks ?? 12,
                   phaseLabel: currentWeek?.theme.isNotEmpty == true
                       ? currentWeek!.theme
@@ -507,11 +711,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       _coachingBookObjective(currentWeek, upcomingWorkout),
                   nextMilestoneTitle: _nextMilestoneTitle(
                     plan,
-                    currentWeekNumber,
+                    displayedWeekNumber,
                   ),
                   nextMilestoneBody: _nextMilestoneBody(
                     plan,
-                    currentWeekNumber,
+                    displayedWeekNumber,
                     _weeklyCoachingPreview,
                   ),
                   weeklyPreview: _weeklyCoachingPreview,
@@ -522,7 +726,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             plan,
                             athleteName,
                             currentWeek,
-                            currentWeekNumber,
+                            displayedWeekNumber,
                             _weeklyCoachingPreview,
                           ),
                 ),
@@ -776,6 +980,119 @@ class _HomeScreenState extends State<HomeScreen> {
     return rawWeekNumber;
   }
 
+  int _displayedWeekNumber(_TrainingPlanResult? plan, int fallbackWeekNumber) {
+    if (plan == null || plan.durationWeeks <= 0) {
+      return fallbackWeekNumber;
+    }
+    if (_viewedWeekNumber == null) {
+      return fallbackWeekNumber.clamp(1, plan.durationWeeks);
+    }
+
+    return _viewedWeekNumber!.clamp(1, plan.durationWeeks);
+  }
+
+  void _shiftViewedWeek(
+    _TrainingPlanResult? plan,
+    int delta,
+    int fallbackWeekNumber,
+  ) {
+    if (plan == null || plan.durationWeeks <= 0 || delta == 0) {
+      return;
+    }
+
+    final int currentDisplayedWeek =
+        _displayedWeekNumber(plan, fallbackWeekNumber);
+    final int nextWeek =
+        (currentDisplayedWeek + delta).clamp(1, plan.durationWeeks);
+    if (nextWeek == currentDisplayedWeek) {
+      return;
+    }
+
+    setState(() {
+      _viewedWeekNumber = nextWeek;
+      _selectedWeekday = null;
+    });
+  }
+
+  void _animateWeekStripTo(
+    double targetOffset, {
+    VoidCallback? onCompleted,
+  }) {
+    _weekStripAnimationController.stop();
+    _weekStripOffsetAnimation = Tween<double>(
+      begin: _weekStripOffset,
+      end: targetOffset,
+    ).animate(
+      CurvedAnimation(
+        parent: _weekStripAnimationController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
+    _weekStripAnimationController
+      ..reset()
+      ..forward().whenCompleteOrCancel(() {
+        onCompleted?.call();
+      });
+  }
+
+  void _animateWeekStripBack() {
+    _animateWeekStripTo(0, onCompleted: () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _weekStripOffset = 0;
+      });
+    });
+  }
+
+  void _handleWeekStripDragEnd({
+    required _TrainingPlanResult? plan,
+    required int fallbackWeekNumber,
+    required double viewportWidth,
+    required double velocity,
+    required double distance,
+  }) {
+    if (plan == null || plan.durationWeeks <= 0) {
+      _animateWeekStripBack();
+      return;
+    }
+
+    final int displayedWeek = _displayedWeekNumber(plan, fallbackWeekNumber);
+    final bool canMovePrevious = displayedWeek > 1;
+    final bool canMoveNext = displayedWeek < plan.durationWeeks;
+    final double threshold = math.max(56, viewportWidth * 0.22);
+
+    if ((velocity > 250 || distance > threshold) && canMovePrevious) {
+      _animateWeekStripTo(viewportWidth, onCompleted: () {
+        if (!mounted) {
+          return;
+        }
+        _shiftViewedWeek(plan, -1, fallbackWeekNumber);
+        setState(() {
+          _weekStripOffset = 0;
+        });
+      });
+      return;
+    }
+
+    if ((velocity < -250 || distance < -threshold) && canMoveNext) {
+      _animateWeekStripTo(-viewportWidth, onCompleted: () {
+        if (!mounted) {
+          return;
+        }
+        _shiftViewedWeek(plan, 1, fallbackWeekNumber);
+        setState(() {
+          _weekStripOffset = 0;
+        });
+      });
+      return;
+    }
+
+    _animateWeekStripBack();
+  }
+
   int _rawCurrentWeekNumber(
     _TrainingPlanResult? plan,
     List<_WorkoutLogItem> workoutLogs,
@@ -820,6 +1137,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
       setState(() {
+        _viewedWeekNumber = null;
         _activeDisplayedWeekNumber = null;
         _activeDisplayedWeekPlanID = null;
       });
@@ -864,6 +1182,11 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     setState(() {
+      if (_viewedWeekNumber == null ||
+          _viewedWeekNumber! > plan.durationWeeks ||
+          _viewedWeekNumber! <= 0) {
+        _viewedWeekNumber = displayedWeekNumber;
+      }
       _activeDisplayedWeekNumber = displayedWeekNumber;
       _activeDisplayedWeekPlanID = plan.planID;
     });
@@ -921,8 +1244,31 @@ class _HomeScreenState extends State<HomeScreen> {
         workout: workout,
         loggedWorkout:
             workout == null ? null : logsByDayNumber[workout.dayNumber],
+        draftSummary: workout == null
+            ? null
+            : _workoutSessionDraftsByKey[_workoutSessionDraftKey(
+                trainingPlanID: _latestTrainingPlan?.planID ?? 0,
+                weekNumber: currentWeek?.weekNumber ?? 0,
+                dayNumber: workout.dayNumber,
+              )],
       );
     });
+  }
+
+  List<_WeekdayWorkoutSlot> _weekSlotsForWeek(
+    _TrainingPlanResult? plan,
+    List<_WorkoutLogItem> workoutLogs,
+    int weekNumber,
+    List<String> preferredDays,
+  ) {
+    final _TrainingPlanWeek? week = _currentWeek(plan, weekNumber);
+    return _currentWeekSlots(
+      week,
+      workoutLogs
+          .where((_WorkoutLogItem item) => item.weekNumber == weekNumber)
+          .toList(growable: false),
+      preferredDays,
+    );
   }
 
   String _currentWeekdayLabel() {
@@ -935,14 +1281,34 @@ class _HomeScreenState extends State<HomeScreen> {
       return null;
     }
 
-    final String selectedLabel = _selectedWeekday ?? _currentWeekdayLabel();
+    if (_selectedWeekday != null && _selectedWeekday!.isNotEmpty) {
+      for (final _WeekdayWorkoutSlot slot in slots) {
+        if (slot.weekdayLabel == _selectedWeekday) {
+          return slot;
+        }
+      }
+    }
+
     for (final _WeekdayWorkoutSlot slot in slots) {
-      if (slot.weekdayLabel == selectedLabel) {
+      if (slot.draftSummary != null && slot.isCurrentDay) {
         return slot;
       }
     }
 
-    return null;
+    for (final _WeekdayWorkoutSlot slot in slots) {
+      if (slot.draftSummary != null) {
+        return slot;
+      }
+    }
+
+    final String currentWeekday = _currentWeekdayLabel();
+    for (final _WeekdayWorkoutSlot slot in slots) {
+      if (slot.weekdayLabel == currentWeekday) {
+        return slot;
+      }
+    }
+
+    return slots.first;
   }
 
   _UpcomingWorkoutData? _upcomingWorkout(
@@ -1200,14 +1566,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _WorkoutSessionDraftSnapshot? initialDraftSnapshot;
     final User? currentUser = _auth.currentUser;
     if (existingLog == null && currentUser != null) {
-      final CachedPayloadSnapshot? cachedDraft = await widget
-          .localCacheRepository
-          .loadWorkoutSessionDraft(
-            firebaseUid: currentUser.uid,
-            trainingPlanId: plan.planID,
-            weekNumber: workout.weekNumber,
-            dayNumber: workout.dayNumber,
-          );
+      final CachedPayloadSnapshot? cachedDraft =
+          await widget.localCacheRepository.loadWorkoutSessionDraft(
+        firebaseUid: currentUser.uid,
+        trainingPlanId: plan.planID,
+        weekNumber: workout.weekNumber,
+        dayNumber: workout.dayNumber,
+      );
       if (cachedDraft != null) {
         initialDraftSnapshot = _parseWorkoutSessionDraftSnapshot(
           cachedDraft.payloadJson,
@@ -1232,6 +1597,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (result == null) {
+      final User? signedInUser = _auth.currentUser;
+      if (signedInUser != null) {
+        await _refreshCachedWorkoutSessionDraftsForPlan(
+          firebaseUid: signedInUser.uid,
+          trainingPlanID: plan.planID,
+        );
+      }
       return;
     }
 
@@ -1278,239 +1650,25 @@ class _HomeScreenState extends State<HomeScreen> {
     int currentWeekNumber,
     _WeeklyCoachingPreview? weeklyPreview,
   ) async {
-    final int nextWeekNumber =
-        _nextMilestoneWeekNumber(plan, currentWeekNumber);
-    final _TrainingPlanWeek? nextWeek = _currentWeek(plan, nextWeekNumber);
-
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: _surfaceAlt,
-      isScrollControlled: true,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  const _CoachPill(label: 'Coaching Book'),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Briefing for $athleteName',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: _textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '${plan.durationWeeks} weeks • ${_programLabel(plan, _backendUser)}',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      color: _textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _Card(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const _SectionTitle('Current Phase'),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Week $currentWeekNumber${currentWeek != null && currentWeek.theme.trim().isNotEmpty ? ' • ${currentWeek.theme.trim()}' : ''}',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: _accentGreen,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          plan.objective,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            height: 1.35,
-                            color: _textPrimary,
-                          ),
-                        ),
-                        if (plan.summary.trim().isNotEmpty) ...<Widget>[
-                          const SizedBox(height: 12),
-                          Text(
-                            plan.summary.trim(),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              height: 1.6,
-                              color: _textSecondary,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _Card(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const _SectionTitle('Next Milestone'),
-                        const SizedBox(height: 12),
-                        Text(
-                          _nextMilestoneTitle(plan, currentWeekNumber),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: _textPrimary,
-                          ),
-                        ),
-                        if (nextWeek != null &&
-                            nextWeek.theme.trim().isNotEmpty) ...<Widget>[
-                          const SizedBox(height: 8),
-                          Text(
-                            nextWeek.theme.trim(),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: _accentBlue,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 12),
-                        Text(
-                          _nextMilestoneBody(
-                            plan,
-                            currentWeekNumber,
-                            weeklyPreview,
-                          ),
-                          style: const TextStyle(
-                            fontSize: 15,
-                            height: 1.6,
-                            color: _textSecondary,
-                          ),
-                        ),
-                        if (weeklyPreview != null &&
-                            weeklyPreview.previewWeek ==
-                                nextWeekNumber) ...<Widget>[
-                          if (weeklyPreview.feedback
-                              .trim()
-                              .isNotEmpty) ...<Widget>[
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Coach feedback',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: _textMuted,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              weeklyPreview.feedback.trim(),
-                              style: const TextStyle(
-                                fontSize: 15,
-                                height: 1.6,
-                                color: _textPrimary,
-                              ),
-                            ),
-                          ],
-                          if (weeklyPreview.motivation
-                              .trim()
-                              .isNotEmpty) ...<Widget>[
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Motivation',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: _textMuted,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              weeklyPreview.motivation.trim(),
-                              style: const TextStyle(
-                                fontSize: 15,
-                                height: 1.6,
-                                color: _textPrimary,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _Card(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const _SectionTitle('How This Block Works'),
-                        if (plan.philosophy.trim().isNotEmpty) ...<Widget>[
-                          const SizedBox(height: 12),
-                          Text(
-                            plan.philosophy.trim(),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              height: 1.6,
-                              color: _textSecondary,
-                            ),
-                          ),
-                        ],
-                        if (plan.progressionStrategy
-                            .trim()
-                            .isNotEmpty) ...<Widget>[
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Progression strategy',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: _textMuted,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            plan.progressionStrategy.trim(),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              height: 1.6,
-                              color: _textSecondary,
-                            ),
-                          ),
-                        ],
-                        if (plan.successCriteria.trim().isNotEmpty) ...<Widget>[
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Success criteria',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: _textMuted,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            plan.successCriteria.trim(),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              height: 1.6,
-                              color: _textSecondary,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) {
+          return _CoachingBookScreen(
+            athleteName: athleteName,
+            plan: plan,
+            currentWeek: currentWeek,
+            currentWeekNumber: currentWeekNumber,
+            weeklyPreview: weeklyPreview,
+            programLabel: _programLabel(plan, _backendUser),
+            nextMilestoneTitle: _nextMilestoneTitle(plan, currentWeekNumber),
+            nextMilestoneBody: _nextMilestoneBody(
+              plan,
+              currentWeekNumber,
+              weeklyPreview,
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -1730,6 +1888,11 @@ class _HomeScreenState extends State<HomeScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      final String promoCode = _promoCodeController.text.trim();
+      if (promoCode.isNotEmpty) {
+        final String token = await _requireIdToken();
+        await _redeemPromoCode(token, promoCode);
+      }
       _setStatus('Account created and signed in.');
     });
   }
@@ -1741,6 +1904,45 @@ class _HomeScreenState extends State<HomeScreen> {
         password: _passwordController.text,
       );
       _setStatus('Signed in successfully.');
+    });
+  }
+
+  Future<void> _redeemPromoCode(String token, String promoCode) async {
+    final Uri uri = Uri.parse(_promoCodesRedeemUrlController.text.trim());
+    final http.Response response = await http.post(
+      uri,
+      headers: <String, String>{
+        HttpHeaders.authorizationHeader: 'Bearer $token',
+        HttpHeaders.contentTypeHeader: 'application/json',
+      },
+      body: jsonEncode(<String, String>{'code': promoCode}),
+    );
+
+    if (response.statusCode == HttpStatus.notFound) {
+      throw const _UiException('Promo code not found.');
+    }
+    if (response.statusCode >= 400) {
+      throw _UiException(
+        'Promo code redemption failed with HTTP ${response.statusCode}.',
+      );
+    }
+
+    final Object? decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      return;
+    }
+    final Object? userValue = decoded['user'];
+    if (userValue is! Map) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _backendUser = _BackendUserProfile.fromJson(
+        Map<String, dynamic>.from(userValue),
+      );
     });
   }
 
@@ -1851,6 +2053,8 @@ class _HomeScreenState extends State<HomeScreen> {
         trainingExperience: result.trainingExperience,
         primaryGoal: result.primaryGoal,
         preferredDays: result.preferredDays,
+        redeemedPromoCode: _backendUser?.redeemedPromoCode ?? '',
+        aiAccessEnabled: _backendUser?.aiAccessEnabled ?? false,
       );
       _deviceMeasurementSystem = result.measurementSystem;
     });
@@ -2074,6 +2278,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _latestTrainingPlan!.planID,
           currentWeekNumber,
           slot.weekdayIndex,
+          selectedWeekday: slot.weekdayLabel,
         );
       }
       return;
@@ -2115,6 +2320,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _latestTrainingPlan!.planID,
         currentWeekNumber,
         slot.workout!.dayNumber,
+        selectedWeekday: slot.weekdayLabel,
       );
       return;
     }
@@ -2132,6 +2338,7 @@ class _HomeScreenState extends State<HomeScreen> {
         currentWeekNumber,
         slot.workout!.dayNumber,
         targetSlot.weekdayIndex,
+        selectedWeekday: targetSlot.weekdayLabel,
       );
     }
   }
@@ -2159,7 +2366,8 @@ class _HomeScreenState extends State<HomeScreen> {
         )
         .toList(growable: false);
     if (candidates.isEmpty) {
-      _showToast('No later empty day is available for moving this workout.');
+      _showToast(
+          'No empty current or future day is available for moving this workout.');
       return null;
     }
 
@@ -2174,16 +2382,19 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           content: SizedBox(
             width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
               children: candidates
                   .map(
-                    (_WeekdayWorkoutSlot slot) => ListTile(
-                      onTap: () => Navigator.of(context).pop(slot),
-                      title: Text(
+                    (_WeekdayWorkoutSlot slot) => ActionChip(
+                      backgroundColor: _surfaceRaised,
+                      side: const BorderSide(color: _outline),
+                      label: Text(
                         slot.weekdayLabel,
                         style: const TextStyle(color: _textPrimary),
                       ),
+                      onPressed: () => Navigator.of(context).pop(slot),
                     ),
                   )
                   .toList(growable: false),
@@ -2203,8 +2414,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _generateWorkoutForDay(
     int trainingPlanID,
     int weekNumber,
-    int dayNumber,
-  ) async {
+    int dayNumber, {
+    String? selectedWeekday,
+  }) async {
     await _mutateTrainingPlan(
       'generate-day',
       <String, Object>{
@@ -2214,6 +2426,7 @@ class _HomeScreenState extends State<HomeScreen> {
       successMessage: 'Extra workout generated.',
       expectedStatusCodes: const <int>{HttpStatus.created},
       trainingPlanID: trainingPlanID,
+      selectedWeekday: selectedWeekday,
     );
   }
 
@@ -2221,8 +2434,9 @@ class _HomeScreenState extends State<HomeScreen> {
     int trainingPlanID,
     int weekNumber,
     int fromDayNumber,
-    int toDayNumber,
-  ) async {
+    int toDayNumber, {
+    String? selectedWeekday,
+  }) async {
     await _mutateTrainingPlan(
       'move-workout',
       <String, Object>{
@@ -2233,14 +2447,16 @@ class _HomeScreenState extends State<HomeScreen> {
       successMessage: 'Workout moved.',
       expectedStatusCodes: const <int>{HttpStatus.ok},
       trainingPlanID: trainingPlanID,
+      selectedWeekday: selectedWeekday,
     );
   }
 
   Future<void> _skipWorkout(
     int trainingPlanID,
     int weekNumber,
-    int dayNumber,
-  ) async {
+    int dayNumber, {
+    String? selectedWeekday,
+  }) async {
     await _mutateTrainingPlan(
       'skip-workout',
       <String, Object>{
@@ -2250,6 +2466,7 @@ class _HomeScreenState extends State<HomeScreen> {
       successMessage: 'Workout skipped.',
       expectedStatusCodes: const <int>{HttpStatus.ok},
       trainingPlanID: trainingPlanID,
+      selectedWeekday: selectedWeekday,
     );
   }
 
@@ -2259,6 +2476,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String successMessage,
     required Set<int> expectedStatusCodes,
     int? trainingPlanID,
+    String? selectedWeekday,
   }) async {
     final int planID = trainingPlanID ?? _latestTrainingPlan?.planID ?? 0;
     if (planID <= 0) {
@@ -2299,6 +2517,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         _latestTrainingPlan = plan;
+        if (selectedWeekday != null && selectedWeekday.isNotEmpty) {
+          _selectedWeekday = selectedWeekday;
+        }
       });
       final User? currentUser = _auth.currentUser;
       if (currentUser != null) {
@@ -2309,6 +2530,12 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
       await _loadWorkoutLogsForPlan(token, plan.planID, announceStatus: false);
+      if (currentUser != null) {
+        await _refreshCachedWorkoutSessionDraftsForPlan(
+          firebaseUid: currentUser.uid,
+          trainingPlanID: plan.planID,
+        );
+      }
       await _syncDisplayedWeekForCurrentPlan();
       await _maybeLoadWeeklyCoachingPreview(token, plan);
       _setStatus(successMessage);
@@ -2445,6 +2672,11 @@ class _HomeScreenState extends State<HomeScreen> {
           weekNumber: draft.weekNumber,
           dayNumber: draft.dayNumber,
         );
+        _removeWorkoutSessionDraftFromState(
+          trainingPlanID: draft.trainingPlanID,
+          weekNumber: draft.weekNumber,
+          dayNumber: draft.dayNumber,
+        );
 
         final List<_WorkoutLogItem> updatedLogs = _upsertWorkoutLogItem(
           _workoutLogs,
@@ -2477,12 +2709,22 @@ class _HomeScreenState extends State<HomeScreen> {
           weekNumber: draft.weekNumber,
           dayNumber: draft.dayNumber,
         );
+        _removeWorkoutSessionDraftFromState(
+          trainingPlanID: draft.trainingPlanID,
+          weekNumber: draft.weekNumber,
+          dayNumber: draft.dayNumber,
+        );
         result = _workoutLogItemFromDraft(draft);
       } on http.ClientException catch (_) {
         await _queueWorkoutLogForSync(currentUser.uid, draft);
         await widget.localCacheRepository.clearWorkoutSessionDraft(
           firebaseUid: currentUser.uid,
           trainingPlanId: draft.trainingPlanID,
+          weekNumber: draft.weekNumber,
+          dayNumber: draft.dayNumber,
+        );
+        _removeWorkoutSessionDraftFromState(
+          trainingPlanID: draft.trainingPlanID,
           weekNumber: draft.weekNumber,
           dayNumber: draft.dayNumber,
         );
@@ -2546,6 +2788,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _mergeQueuedWorkoutLogs(logs, queuedWorkoutLogs),
       );
     });
+    if (currentUser != null) {
+      await _refreshCachedWorkoutSessionDraftsForPlan(
+        firebaseUid: currentUser.uid,
+        trainingPlanID: trainingPlanID,
+      );
+    }
     await _syncDisplayedWeekForCurrentPlan();
 
     if (announceStatus) {
@@ -2557,12 +2805,21 @@ class _HomeScreenState extends State<HomeScreen> {
     String token,
     _TrainingPlanResult plan,
   ) async {
+    final User? currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      return;
+    }
+
     if (DateTime.now().weekday != DateTime.monday) {
       if (_weeklyCoachingPreview != null && mounted) {
         setState(() {
           _weeklyCoachingPreview = null;
         });
       }
+      await widget.preferences.clearWeeklyPreviewCache(
+        firebaseUid: currentUser.uid,
+        trainingPlanId: plan.planID,
+      );
       return;
     }
 
@@ -2581,12 +2838,37 @@ class _HomeScreenState extends State<HomeScreen> {
           _weeklyCoachingPreview = null;
         });
       }
+      await widget.preferences.clearWeeklyPreviewCache(
+        firebaseUid: currentUser.uid,
+        trainingPlanId: plan.planID,
+      );
       return;
     }
 
+    final String currentAnchor = _weekAnchorKey(DateTime.now());
     if (_weeklyCoachingPreview != null &&
         _weeklyCoachingPreview!.trainingPlanID == plan.planID &&
-        _weeklyCoachingPreview!.currentWeek == currentWeekNumber) {
+        _weeklyCoachingPreview!.currentWeek == currentWeekNumber &&
+        widget.preferences.getWeeklyPreviewAnchor(
+              firebaseUid: currentUser.uid,
+              trainingPlanId: plan.planID,
+            ) ==
+            currentAnchor) {
+      return;
+    }
+
+    final _WeeklyCoachingPreview? cachedPreview =
+        _loadCachedWeeklyCoachingPreview(
+      firebaseUid: currentUser.uid,
+      plan: plan,
+      workoutLogs: workoutLogsForPlan,
+    );
+    if (cachedPreview != null) {
+      if (mounted) {
+        setState(() {
+          _weeklyCoachingPreview = cachedPreview;
+        });
+      }
       return;
     }
 
@@ -2614,6 +2896,17 @@ class _HomeScreenState extends State<HomeScreen> {
     if (preview == null || !mounted) {
       return;
     }
+
+    await widget.preferences.setWeeklyPreviewCache(
+      firebaseUid: currentUser.uid,
+      trainingPlanId: plan.planID,
+      value: response.body,
+    );
+    await widget.preferences.setWeeklyPreviewAnchor(
+      firebaseUid: currentUser.uid,
+      trainingPlanId: plan.planID,
+      value: currentAnchor,
+    );
 
     setState(() {
       _weeklyCoachingPreview = preview;
@@ -2833,6 +3126,42 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return _WorkoutSessionDraftSnapshot.fromJson(decoded);
+  }
+
+  _WeeklyCoachingPreview? _loadCachedWeeklyCoachingPreview({
+    required String firebaseUid,
+    required _TrainingPlanResult plan,
+    required List<_WorkoutLogItem> workoutLogs,
+  }) {
+    final int currentWeekNumber = _currentWeekNumber(plan, workoutLogs);
+    final String currentAnchor = _weekAnchorKey(DateTime.now());
+    final String cachedAnchor = widget.preferences.getWeeklyPreviewAnchor(
+      firebaseUid: firebaseUid,
+      trainingPlanId: plan.planID,
+    );
+    if (cachedAnchor != currentAnchor) {
+      return null;
+    }
+
+    final String cachedBody = widget.preferences.getWeeklyPreviewCache(
+      firebaseUid: firebaseUid,
+      trainingPlanId: plan.planID,
+    );
+    if (cachedBody.isEmpty) {
+      return null;
+    }
+
+    final _WeeklyCoachingPreview? preview =
+        _parseWeeklyCoachingPreview(cachedBody);
+    if (preview == null) {
+      return null;
+    }
+    if (preview.trainingPlanID != plan.planID ||
+        preview.currentWeek != currentWeekNumber) {
+      return null;
+    }
+
+    return preview;
   }
 
   List<_WorkoutLogItem> _parseWorkoutLogsFromResponse(String body) {
@@ -3479,6 +3808,152 @@ class _HomeScreenState extends State<HomeScreen> {
     return next;
   }
 
+  String _workoutSessionDraftKey({
+    required int trainingPlanID,
+    required int weekNumber,
+    required int dayNumber,
+  }) {
+    return '$trainingPlanID:$weekNumber:$dayNumber';
+  }
+
+  Future<Map<String, _WorkoutSessionDraftSummary>>
+      _loadCachedWorkoutSessionDraftsForPlan({
+    required String firebaseUid,
+    required int trainingPlanID,
+  }) async {
+    final List<WorkoutSessionDraftCacheEntry> entries =
+        await widget.localCacheRepository.loadWorkoutSessionDrafts(
+      firebaseUid: firebaseUid,
+      trainingPlanId: trainingPlanID,
+    );
+
+    final Map<String, _WorkoutSessionDraftSummary> draftsByKey =
+        <String, _WorkoutSessionDraftSummary>{};
+    for (final WorkoutSessionDraftCacheEntry entry in entries) {
+      final _WorkoutSessionDraftSnapshot? snapshot =
+          _parseWorkoutSessionDraftSnapshot(entry.payloadJson);
+      if (snapshot == null) {
+        continue;
+      }
+
+      final _WorkoutSessionDraftSummary summary = _summarizeWorkoutSessionDraft(
+        snapshot,
+        entry.updatedAt,
+      );
+      draftsByKey[_workoutSessionDraftKey(
+        trainingPlanID: summary.trainingPlanID,
+        weekNumber: summary.weekNumber,
+        dayNumber: summary.dayNumber,
+      )] = summary;
+    }
+
+    return draftsByKey;
+  }
+
+  Future<void> _refreshCachedWorkoutSessionDraftsForPlan({
+    required String firebaseUid,
+    required int trainingPlanID,
+  }) async {
+    final Map<String, _WorkoutSessionDraftSummary> draftsByKey =
+        await _loadCachedWorkoutSessionDraftsForPlan(
+      firebaseUid: firebaseUid,
+      trainingPlanID: trainingPlanID,
+    );
+    if (!mounted) {
+      return;
+    }
+
+    final Map<String, _WorkoutSessionDraftSummary> retainedDrafts =
+        Map<String, _WorkoutSessionDraftSummary>.from(
+      _workoutSessionDraftsByKey,
+    )..removeWhere(
+            (
+              String _,
+              _WorkoutSessionDraftSummary value,
+            ) =>
+                value.trainingPlanID == trainingPlanID,
+          );
+
+    setState(() {
+      _workoutSessionDraftsByKey = <String, _WorkoutSessionDraftSummary>{
+        ...retainedDrafts,
+        ...draftsByKey,
+      };
+    });
+  }
+
+  void _removeWorkoutSessionDraftFromState({
+    required int trainingPlanID,
+    required int weekNumber,
+    required int dayNumber,
+  }) {
+    final String key = _workoutSessionDraftKey(
+      trainingPlanID: trainingPlanID,
+      weekNumber: weekNumber,
+      dayNumber: dayNumber,
+    );
+    if (!_workoutSessionDraftsByKey.containsKey(key)) {
+      return;
+    }
+
+    setState(() {
+      _workoutSessionDraftsByKey = <String, _WorkoutSessionDraftSummary>{
+        ..._workoutSessionDraftsByKey,
+      }..remove(key);
+    });
+  }
+
+  _WorkoutSessionDraftSummary _summarizeWorkoutSessionDraft(
+    _WorkoutSessionDraftSnapshot snapshot,
+    DateTime updatedAt,
+  ) {
+    int setCount = 0;
+    int completedSetCount = 0;
+    double totalReps = 0;
+    final Map<String, double> estimatedVolumeByUnit = <String, double>{};
+
+    for (final _WorkoutLogDraftExercise exercise in snapshot.exercises) {
+      for (final _WorkoutLogDraftSet set in exercise.sets) {
+        setCount++;
+        if (set.completed) {
+          completedSetCount++;
+          totalReps += set.reps ?? 0;
+        }
+        _appendLoggedTrackedVolumeFromDraftSetItem(estimatedVolumeByUnit, set);
+      }
+    }
+
+    double? estimatedVolume;
+    String estimatedVolumeUnit = '';
+    if (estimatedVolumeByUnit.isNotEmpty) {
+      final List<MapEntry<String, double>> orderedEntries =
+          estimatedVolumeByUnit.entries.toList()
+            ..sort(
+              (MapEntry<String, double> a, MapEntry<String, double> b) =>
+                  b.value.compareTo(a.value),
+            );
+      estimatedVolumeUnit = orderedEntries.first.key;
+      estimatedVolume = orderedEntries.first.value;
+    }
+
+    return _WorkoutSessionDraftSummary(
+      trainingPlanID: snapshot.trainingPlanID,
+      weekNumber: snapshot.weekNumber,
+      dayNumber: snapshot.dayNumber,
+      title: snapshot.title,
+      focus: snapshot.focus,
+      durationMinutes: snapshot.durationMinutes,
+      currentStep: snapshot.currentStep,
+      sessionFeelIndex: snapshot.sessionFeelIndex,
+      setCount: setCount,
+      completedSetCount: completedSetCount,
+      totalReps: totalReps,
+      estimatedVolume: estimatedVolume,
+      estimatedVolumeUnit: estimatedVolumeUnit,
+      updatedAt: updatedAt,
+    );
+  }
+
   Future<void> _loadBackendUserProfile(
     String token, {
     bool announceStatus = true,
@@ -3605,6 +4080,7 @@ class _AuthOnboardingScreen extends StatelessWidget {
   const _AuthOnboardingScreen({
     required this.emailController,
     required this.passwordController,
+    required this.promoCodeController,
     required this.busy,
     required this.status,
     required this.onCreateAccount,
@@ -3613,6 +4089,7 @@ class _AuthOnboardingScreen extends StatelessWidget {
 
   final TextEditingController emailController;
   final TextEditingController passwordController;
+  final TextEditingController promoCodeController;
   final bool busy;
   final String? status;
   final Future<void> Function() onCreateAccount;
@@ -3675,6 +4152,17 @@ class _AuthOnboardingScreen extends StatelessWidget {
                       obscureText: true,
                       decoration: const InputDecoration(
                         labelText: 'Password',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: promoCodeController,
+                      autocorrect: false,
+                      decoration: const InputDecoration(
+                        labelText: 'Promo Code',
+                        helperText:
+                            'Optional. Invited users can unlock paid AI features.',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -3947,9 +4435,11 @@ class _WeekdayCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color fillColor = slot.loggedWorkout != null
         ? _accentGreen
-        : slot.hasWorkout
-            ? _accentBlue
-            : _surfaceRaised;
+        : slot.draftSummary != null
+            ? const Color(0xFFFFB454)
+            : slot.hasWorkout
+                ? _accentBlue
+                : _surfaceRaised;
     final Color borderColor = isCurrentDay
         ? const Color(0xFFFFD166)
         : isSelected
@@ -4006,6 +4496,27 @@ class _WorkoutDayDetailCard extends StatelessWidget {
   final _WeekdayWorkoutSlot slot;
   final VoidCallback? onStart;
   final VoidCallback? onReview;
+
+  String _draftStepLabel(int currentStep) {
+    if (currentStep <= 0) {
+      return 'At briefing';
+    }
+    return 'Step ${currentStep + 1}';
+  }
+
+  String _draftUpdatedLabel(DateTime updatedAt) {
+    final Duration age = DateTime.now().difference(updatedAt.toLocal());
+    if (age.inMinutes <= 1) {
+      return 'just now';
+    }
+    if (age.inHours < 1) {
+      return '${age.inMinutes} min ago';
+    }
+    if (age.inDays < 1) {
+      return '${age.inHours} h ago';
+    }
+    return '${age.inDays} d ago';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -4082,6 +4593,87 @@ class _WorkoutDayDetailCard extends StatelessWidget {
               OutlinedButton(
                 onPressed: onReview,
                 child: const Text('Session Review'),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    if (slot.draftSummary != null && slot.workout != null) {
+      final _WorkoutSessionDraftSummary draft = slot.draftSummary!;
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _outline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              '${slot.weekdayLabel} · In Progress',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFFFB454),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              draft.title,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: _textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              draft.focus.isNotEmpty
+                  ? draft.focus
+                  : 'Your session draft is saved on this device and ready to resume.',
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.45,
+                color: _textSecondary,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: <Widget>[
+                _DetailPill(
+                  label:
+                      '${draft.completedSetCount}/${draft.setCount} sets complete',
+                ),
+                _DetailPill(label: '${draft.totalReps.round()} reps'),
+                if (draft.hasEstimatedVolume)
+                  _DetailPill(
+                    label:
+                        '${_formatVolumeValue(draft.estimatedVolume!)} ${draft.estimatedVolumeUnit}',
+                  ),
+                if (draft.durationMinutes != null)
+                  _DetailPill(label: '${draft.durationMinutes} min'),
+                _DetailPill(label: _draftStepLabel(draft.currentStep)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Saved ${_draftUpdatedLabel(draft.updatedAt)}',
+              style: const TextStyle(
+                fontSize: 13,
+                color: _textMuted,
+              ),
+            ),
+            if (onStart != null) ...<Widget>[
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: onStart,
+                child: const Text('Resume Workout'),
               ),
             ],
           ],
@@ -4251,6 +4843,538 @@ class _MiniProgressRingPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _MiniProgressRingPainter oldDelegate) {
     return oldDelegate.progress != progress || oldDelegate.color != color;
+  }
+}
+
+class _WeeklyMondayBriefingCard extends StatelessWidget {
+  const _WeeklyMondayBriefingCard({
+    required this.currentWeekNumber,
+    required this.totalWeeks,
+    required this.phaseLabel,
+    required this.weeklyPreview,
+    required this.nextMilestoneTitle,
+    required this.nextMilestoneBody,
+    required this.onReadCoachingBook,
+  });
+
+  final int currentWeekNumber;
+  final int totalWeeks;
+  final String phaseLabel;
+  final _WeeklyCoachingPreview? weeklyPreview;
+  final String nextMilestoneTitle;
+  final String nextMilestoneBody;
+  final VoidCallback? onReadCoachingBook;
+
+  @override
+  Widget build(BuildContext context) {
+    final String feedback = weeklyPreview?.feedback.trim() ?? '';
+    final String motivation = weeklyPreview?.motivation.trim() ?? '';
+    final bool hasGeneratedBriefing =
+        feedback.isNotEmpty || motivation.isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: _outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'This Week\'s Briefing',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: _textMuted,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Week $currentWeekNumber of $totalWeeks',
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: _textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            phaseLabel,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: _accentGreen,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('Coach Check-In'),
+                const SizedBox(height: 12),
+                Text(
+                  hasGeneratedBriefing
+                      ? feedback
+                      : 'Your coach is preparing this week\'s briefing. Open the coaching book to stay anchored in the plan until the note arrives.',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    height: 1.6,
+                    color: _textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('Next Milestone'),
+                const SizedBox(height: 12),
+                Text(
+                  nextMilestoneTitle,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: _textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  nextMilestoneBody,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    height: 1.55,
+                    color: _textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (motivation.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _surfaceRaised,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _outlineSoft),
+              ),
+              child: Text(
+                motivation,
+                style: TextStyle(
+                  fontSize: 15,
+                  height: 1.55,
+                  color: _accentGreen.withValues(alpha: 0.95),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          InkWell(
+            onTap: onReadCoachingBook,
+            borderRadius: BorderRadius.circular(999),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    'Read Coaching Book',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: onReadCoachingBook == null
+                          ? _textMuted
+                          : _accentGreen.withValues(alpha: 0.95),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 18,
+                    color: onReadCoachingBook == null
+                        ? _textMuted
+                        : _accentGreen.withValues(alpha: 0.95),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CoachingBookScreen extends StatelessWidget {
+  const _CoachingBookScreen({
+    required this.athleteName,
+    required this.plan,
+    required this.currentWeek,
+    required this.currentWeekNumber,
+    required this.weeklyPreview,
+    required this.programLabel,
+    required this.nextMilestoneTitle,
+    required this.nextMilestoneBody,
+  });
+
+  final String athleteName;
+  final _TrainingPlanResult plan;
+  final _TrainingPlanWeek? currentWeek;
+  final int currentWeekNumber;
+  final _WeeklyCoachingPreview? weeklyPreview;
+  final String programLabel;
+  final String nextMilestoneTitle;
+  final String nextMilestoneBody;
+
+  @override
+  Widget build(BuildContext context) {
+    final int nextWeekNumber = _coachingBookNextMilestoneWeekNumber(
+      plan,
+      currentWeekNumber,
+    );
+    final _TrainingPlanWeek? nextWeek = _coachingBookWeek(plan, nextWeekNumber);
+
+    return Scaffold(
+      backgroundColor: _bgTop,
+      appBar: AppBar(
+        backgroundColor: _bgTop,
+        surfaceTintColor: Colors.transparent,
+        title: const Text(
+          'Coaching Book',
+          style: TextStyle(color: _textPrimary),
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const _CoachPill(label: 'Coaching Book'),
+              const SizedBox(height: 16),
+              Text(
+                'Written for $athleteName',
+                style: const TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  color: _textPrimary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '${plan.durationWeeks} weeks • $programLabel',
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: _textSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const _SectionTitle('Program Objective'),
+                    const SizedBox(height: 12),
+                    Text(
+                      plan.objective,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                        color: _textPrimary,
+                      ),
+                    ),
+                    if (plan.summary.trim().isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        plan.summary.trim(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const _SectionTitle('Current Week'),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Week $currentWeekNumber${currentWeek != null && currentWeek!.theme.trim().isNotEmpty ? ' • ${currentWeek!.theme.trim()}' : ''}',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: _accentGreen,
+                      ),
+                    ),
+                    if (weeklyPreview != null &&
+                        weeklyPreview!.feedback.trim().isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        weeklyPreview!.feedback.trim(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ] else if (currentWeek != null &&
+                        currentWeek!.theme.trim().isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        currentWeek!.theme.trim(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ],
+                    if (weeklyPreview != null &&
+                        weeklyPreview!.motivation
+                            .trim()
+                            .isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        weeklyPreview!.motivation.trim(),
+                        style: TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: _accentGreen.withValues(alpha: 0.95),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const _SectionTitle('Week Timeline'),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: plan.weeks
+                          .map(
+                            (_TrainingPlanWeek week) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: week.weekNumber == currentWeekNumber
+                                    ? _accentGreen.withValues(alpha: 0.18)
+                                    : _surfaceRaised,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: week.weekNumber == currentWeekNumber
+                                      ? _accentGreen
+                                      : _outlineSoft,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  Text(
+                                    'Week ${week.weekNumber}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color:
+                                          week.weekNumber == currentWeekNumber
+                                              ? _accentGreen
+                                              : _textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  SizedBox(
+                                    width: 140,
+                                    child: Text(
+                                      week.theme.trim().isEmpty
+                                          ? 'Program week'
+                                          : week.theme.trim(),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        height: 1.4,
+                                        color: _textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const _SectionTitle('Next Milestone'),
+                    const SizedBox(height: 12),
+                    Text(
+                      nextMilestoneTitle,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: _textPrimary,
+                      ),
+                    ),
+                    if (nextWeek != null &&
+                        nextWeek.theme.trim().isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 8),
+                      Text(
+                        nextWeek.theme.trim(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: _accentBlue,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Text(
+                      nextMilestoneBody,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.6,
+                        color: _textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const _SectionTitle('How This Block Works'),
+                    if (plan.philosophy.trim().isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        plan.philosophy.trim(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ],
+                    if (plan.progressionStrategy.trim().isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Progression strategy',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        plan.progressionStrategy.trim(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (plan.risks.trim().isNotEmpty) ...<Widget>[
+                const SizedBox(height: 16),
+                _Card(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      const _SectionTitle('Risks & Watchouts'),
+                      const SizedBox(height: 12),
+                      Text(
+                        plan.risks.trim(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (plan.successCriteria.trim().isNotEmpty) ...<Widget>[
+                const SizedBox(height: 16),
+                _Card(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      const _SectionTitle('Success Criteria'),
+                      const SizedBox(height: 12),
+                      Text(
+                        plan.successCriteria.trim(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  _TrainingPlanWeek? _coachingBookWeek(
+      _TrainingPlanResult plan, int weekNumber) {
+    for (final _TrainingPlanWeek week in plan.weeks) {
+      if (week.weekNumber == weekNumber) {
+        return week;
+      }
+    }
+    return null;
+  }
+
+  int _coachingBookNextMilestoneWeekNumber(
+    _TrainingPlanResult plan,
+    int currentWeekNumber,
+  ) {
+    if (currentWeekNumber >= plan.durationWeeks) {
+      return plan.durationWeeks;
+    }
+
+    final int nextWeek = currentWeekNumber + 1;
+    return nextWeek.clamp(1, plan.durationWeeks);
   }
 }
 
@@ -5441,15 +6565,18 @@ class _WeekdayWorkoutSlot {
     required this.weekdayIndex,
     required this.workout,
     required this.loggedWorkout,
+    required this.draftSummary,
   });
 
   final String weekdayLabel;
   final int weekdayIndex;
   final _TrainingPlanWorkout? workout;
   final _WorkoutLogItem? loggedWorkout;
+  final _WorkoutSessionDraftSummary? draftSummary;
 
   bool get hasWorkout => workout != null;
   bool get isCurrentDay => DateTime.now().weekday == weekdayIndex;
+  bool get hasDraft => draftSummary != null;
 }
 
 class _RecentWorkoutLogsCard extends StatelessWidget {
@@ -5980,7 +7107,8 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
         initialDraftSnapshot.exercises.isNotEmpty) {
       return initialDraftSnapshot.exercises
           .map(
-            (_WorkoutLogDraftExercise exercise) => _WorkoutLogExerciseDraftState(
+            (_WorkoutLogDraftExercise exercise) =>
+                _WorkoutLogExerciseDraftState(
               title: exercise.title,
               notes: exercise.notes,
               sets: exercise.sets
@@ -7569,6 +8697,45 @@ class _WorkoutLogReviewItem {
   final bool generated;
 }
 
+class _WorkoutSessionDraftSummary {
+  const _WorkoutSessionDraftSummary({
+    required this.trainingPlanID,
+    required this.weekNumber,
+    required this.dayNumber,
+    required this.title,
+    required this.focus,
+    required this.durationMinutes,
+    required this.currentStep,
+    required this.sessionFeelIndex,
+    required this.setCount,
+    required this.completedSetCount,
+    required this.totalReps,
+    required this.estimatedVolume,
+    required this.estimatedVolumeUnit,
+    required this.updatedAt,
+  });
+
+  final int trainingPlanID;
+  final int weekNumber;
+  final int dayNumber;
+  final String title;
+  final String focus;
+  final int? durationMinutes;
+  final int currentStep;
+  final int sessionFeelIndex;
+  final int setCount;
+  final int completedSetCount;
+  final double totalReps;
+  final double? estimatedVolume;
+  final String estimatedVolumeUnit;
+  final DateTime updatedAt;
+
+  bool get hasEstimatedVolume =>
+      estimatedVolume != null &&
+      estimatedVolume! > 0 &&
+      estimatedVolumeUnit.isNotEmpty;
+}
+
 class _BackendUserProfile {
   const _BackendUserProfile({
     required this.id,
@@ -7578,6 +8745,8 @@ class _BackendUserProfile {
     required this.trainingExperience,
     required this.primaryGoal,
     required this.preferredDays,
+    required this.redeemedPromoCode,
+    required this.aiAccessEnabled,
   });
 
   factory _BackendUserProfile.fromJson(Map<String, dynamic> json) {
@@ -7592,6 +8761,8 @@ class _BackendUserProfile {
       preferredDays: preferredDaysValue is List<dynamic>
           ? preferredDaysValue.whereType<String>().toList(growable: false)
           : const <String>[],
+      redeemedPromoCode: (json['redeemed_promo_code'] as String?) ?? '',
+      aiAccessEnabled: json['ai_access_enabled'] as bool? ?? false,
     );
   }
 
@@ -7602,6 +8773,8 @@ class _BackendUserProfile {
   final String trainingExperience;
   final String primaryGoal;
   final List<String> preferredDays;
+  final String redeemedPromoCode;
+  final bool aiAccessEnabled;
 }
 
 class _PlannedVsActualSummary {

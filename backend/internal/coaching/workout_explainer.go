@@ -48,15 +48,23 @@ type WorkoutExplanationResult struct {
 
 type WorkoutExplainerService struct {
 	store      WorkoutExplanationStore
-	explainer  ai.WorkoutExplainer
+	access     AIAccessStore
+	freeAI     ai.WorkoutExplainer
+	paidAI     ai.WorkoutExplainer
 	dailyLimit int
 	now        func() time.Time
 }
 
 func NewWorkoutExplainerService(store WorkoutExplanationStore, explainer ai.WorkoutExplainer, dailyLimit int) *WorkoutExplainerService {
+	return NewWorkoutExplainerServiceWithAccessControl(store, nil, explainer, explainer, dailyLimit)
+}
+
+func NewWorkoutExplainerServiceWithAccessControl(store WorkoutExplanationStore, access AIAccessStore, freeAI ai.WorkoutExplainer, paidAI ai.WorkoutExplainer, dailyLimit int) *WorkoutExplainerService {
 	return &WorkoutExplainerService{
 		store:      store,
-		explainer:  explainer,
+		access:     access,
+		freeAI:     freeAI,
+		paidAI:     paidAI,
 		dailyLimit: dailyLimit,
 		now:        time.Now,
 	}
@@ -93,7 +101,12 @@ func (s *WorkoutExplainerService) ExplainWorkout(ctx context.Context, user auth.
 		return WorkoutExplanationResult{}, ErrWorkoutNotFound
 	}
 
-	generated, err := s.explainer.ExplainWorkout(ctx, workout)
+	explainer, err := s.explainerForUser(ctx, user)
+	if err != nil {
+		return WorkoutExplanationResult{}, err
+	}
+
+	generated, err := explainer.ExplainWorkout(ctx, workout)
 	if err != nil {
 		return WorkoutExplanationResult{}, fmt.Errorf("generate workout explanation: %w", err)
 	}
@@ -104,6 +117,22 @@ func (s *WorkoutExplainerService) ExplainWorkout(ctx context.Context, user auth.
 	}
 
 	return buildResult(stored, true, s.dailyLimit, generatedToday+1), nil
+}
+
+func (s *WorkoutExplainerService) explainerForUser(ctx context.Context, user auth.User) (ai.WorkoutExplainer, error) {
+	if s.access == nil {
+		return s.paidAI, nil
+	}
+
+	enabled, err := s.access.HasPaidAIAccessForUser(ctx, user)
+	if err != nil {
+		return nil, fmt.Errorf("check ai access: %w", err)
+	}
+	if enabled {
+		return s.paidAI, nil
+	}
+
+	return s.freeAI, nil
 }
 
 func (s *WorkoutExplainerService) countGeneratedToday(ctx context.Context, user auth.User) (int, error) {

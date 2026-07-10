@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/josefkarasek/ai-fitness-coach/backend/internal/ai"
 	backendAuth "github.com/josefkarasek/ai-fitness-coach/backend/internal/auth/firebase"
 	"github.com/josefkarasek/ai-fitness-coach/backend/internal/coaching"
@@ -41,29 +40,33 @@ func main() {
 
 	healthHandler := httpHandlers.NewHealthHandler(db)
 	authHandler := httpHandlers.NewAuthHandler()
+	userStore := postgres.NewUserStore(db)
+	promoCodeHandler := httpHandlers.NewPromoCodeHandler(userStore)
 	importHandler := httpHandlers.NewImportHandler(postgres.NewTrainingHistoryStore(db))
 	workoutStore := postgres.NewWorkoutStore(db)
 	workoutLogStore := postgres.NewWorkoutLogStore(db)
 	workoutsHandler := httpHandlers.NewWorkoutsHandler(workoutStore)
 	trainingPlanStore := postgres.NewTrainingPlanStore(db)
 
-	authentication, err := buildAuthentication(ctx, cfg, db)
+	authentication, err := buildAuthentication(ctx, cfg, userStore)
 	if err != nil {
 		logger.Error("build authentication", "error", err)
 		os.Exit(1)
 	}
 
-	workoutExplainer, err := buildWorkoutExplainer(cfg)
+	freeWorkoutExplainer := ai.NewMockWorkoutExplainer(cfg.AIModel)
+	paidWorkoutExplainer, err := buildWorkoutExplainer(cfg)
 	if err != nil {
 		logger.Error("build workout explainer", "error", err)
 		os.Exit(1)
 	}
 
 	workoutExplanationHandler := httpHandlers.NewWorkoutExplanationHandler(
-		coaching.NewWorkoutExplainerService(workoutStore, workoutExplainer, cfg.AIDailyWorkoutExplanationLimit),
+		coaching.NewWorkoutExplainerServiceWithAccessControl(workoutStore, userStore, freeWorkoutExplainer, paidWorkoutExplainer, cfg.AIDailyWorkoutExplanationLimit),
 	)
 
-	workoutLogReviewer, err := buildWorkoutLogReviewer(cfg)
+	freeWorkoutLogReviewer := ai.NewMockWorkoutLogReviewer(cfg.AIModel)
+	paidWorkoutLogReviewer, err := buildWorkoutLogReviewer(cfg)
 	if err != nil {
 		logger.Error("build workout log reviewer", "error", err)
 		os.Exit(1)
@@ -71,27 +74,29 @@ func main() {
 
 	workoutLogsHandler := httpHandlers.NewWorkoutLogsHandler(
 		workoutLogStore,
-		coaching.NewWorkoutLogReviewerService(workoutLogStore, workoutLogReviewer, cfg.AIDailyWorkoutReviewLimit),
+		coaching.NewWorkoutLogReviewerServiceWithAccessControl(workoutLogStore, userStore, freeWorkoutLogReviewer, paidWorkoutLogReviewer, cfg.AIDailyWorkoutReviewLimit),
 	)
 
-	trainingPlanner, err := buildTrainingPlanner(cfg)
+	freeTrainingPlanner := ai.NewMockTrainingPlanner(cfg.AIModel)
+	paidTrainingPlanner, err := buildTrainingPlanner(cfg)
 	if err != nil {
 		logger.Error("build training planner", "error", err)
 		os.Exit(1)
 	}
 
-	weeklyCoachingPreviewer, err := buildWeeklyCoachingPreviewer(cfg)
+	freeWeeklyCoachingPreviewer := ai.NewMockWeeklyCoachingPreviewer(cfg.AIModel)
+	paidWeeklyCoachingPreviewer, err := buildWeeklyCoachingPreviewer(cfg)
 	if err != nil {
 		logger.Error("build weekly coaching previewer", "error", err)
 		os.Exit(1)
 	}
 
 	trainingPlansHandler := httpHandlers.NewTrainingPlansHandler(
-		coaching.NewTrainingPlannerService(trainingPlanStore, trainingPlanner, cfg.AIDailyTrainingPlanLimit),
-		coaching.NewWeeklyCoachingPreviewService(trainingPlanStore, weeklyCoachingPreviewer),
+		coaching.NewTrainingPlannerServiceWithAccessControl(trainingPlanStore, userStore, freeTrainingPlanner, paidTrainingPlanner, cfg.AIDailyTrainingPlanLimit),
+		coaching.NewWeeklyCoachingPreviewServiceWithAccessControl(trainingPlanStore, userStore, freeWeeklyCoachingPreviewer, paidWeeklyCoachingPreviewer),
 	)
 
-	router := httpRouter.New(healthHandler, authHandler, importHandler, workoutsHandler, workoutLogsHandler, workoutExplanationHandler, trainingPlansHandler, authentication)
+	router := httpRouter.New(healthHandler, authHandler, promoCodeHandler, importHandler, workoutsHandler, workoutLogsHandler, workoutExplanationHandler, trainingPlansHandler, authentication)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddress(),
@@ -121,7 +126,7 @@ func main() {
 	logger.Info("server stopped")
 }
 
-func buildAuthentication(ctx context.Context, cfg config.Config, db *pgxpool.Pool) (*httpMiddleware.Authentication, error) {
+func buildAuthentication(ctx context.Context, cfg config.Config, users *postgres.UserStore) (*httpMiddleware.Authentication, error) {
 	switch cfg.AuthMode {
 	case "", "disabled":
 		return nil, nil
@@ -131,7 +136,7 @@ func buildAuthentication(ctx context.Context, cfg config.Config, db *pgxpool.Poo
 			return nil, err
 		}
 
-		return httpMiddleware.NewAuthentication(verifier, postgres.NewUserStore(db)), nil
+		return httpMiddleware.NewAuthentication(verifier, users), nil
 	default:
 		return nil, fmt.Errorf("unsupported auth mode %q", cfg.AuthMode)
 	}

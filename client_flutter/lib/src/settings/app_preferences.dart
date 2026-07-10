@@ -8,6 +8,8 @@ class AppPreferences {
   static const String _lastSignedInUidKey = 'last_signed_in_uid';
   static const String _activePlanWeekNumberPrefix = 'active_plan_week_number';
   static const String _activePlanWeekAnchorPrefix = 'active_plan_week_anchor';
+  static const String _weeklyPreviewCachePrefix = 'weekly_preview_cache';
+  static const String _weeklyPreviewAnchorPrefix = 'weekly_preview_anchor';
 
   final SharedPreferences _prefs;
 
@@ -69,6 +71,60 @@ class AppPreferences {
     await _prefs.setString(
       '$_activePlanWeekAnchorPrefix:$firebaseUid:$trainingPlanId',
       value,
+    );
+  }
+
+  String getWeeklyPreviewAnchor({
+    required String firebaseUid,
+    required int trainingPlanId,
+  }) {
+    return _prefs.getString(
+          '$_weeklyPreviewAnchorPrefix:$firebaseUid:$trainingPlanId',
+        ) ??
+        '';
+  }
+
+  Future<void> setWeeklyPreviewAnchor({
+    required String firebaseUid,
+    required int trainingPlanId,
+    required String value,
+  }) async {
+    await _prefs.setString(
+      '$_weeklyPreviewAnchorPrefix:$firebaseUid:$trainingPlanId',
+      value,
+    );
+  }
+
+  String getWeeklyPreviewCache({
+    required String firebaseUid,
+    required int trainingPlanId,
+  }) {
+    return _prefs.getString(
+          '$_weeklyPreviewCachePrefix:$firebaseUid:$trainingPlanId',
+        ) ??
+        '';
+  }
+
+  Future<void> setWeeklyPreviewCache({
+    required String firebaseUid,
+    required int trainingPlanId,
+    required String value,
+  }) async {
+    await _prefs.setString(
+      '$_weeklyPreviewCachePrefix:$firebaseUid:$trainingPlanId',
+      value,
+    );
+  }
+
+  Future<void> clearWeeklyPreviewCache({
+    required String firebaseUid,
+    required int trainingPlanId,
+  }) async {
+    await _prefs.remove(
+      '$_weeklyPreviewCachePrefix:$firebaseUid:$trainingPlanId',
+    );
+    await _prefs.remove(
+      '$_weeklyPreviewAnchorPrefix:$firebaseUid:$trainingPlanId',
     );
   }
 }

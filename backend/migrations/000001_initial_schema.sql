@@ -13,9 +13,31 @@ create table if not exists users (
     training_experience text,
     primary_goal text,
     preferred_days text[],
+    redeemed_promo_code text,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
+
+create table if not exists promo_codes (
+    code text primary key,
+    description text,
+    active boolean not null default true,
+    created_at timestamptz not null default now()
+);
+
+insert into promo_codes (code, description, active)
+values ('squat', 'preloaded invited-user promo code', true)
+on conflict (code) do nothing;
+
+alter table if exists users
+    add column if not exists redeemed_promo_code text;
+
+alter table if exists users
+    drop constraint if exists users_redeemed_promo_code_fkey;
+
+alter table if exists users
+    add constraint users_redeemed_promo_code_fkey
+    foreign key (redeemed_promo_code) references promo_codes (code) on delete set null;
 
 create table if not exists athletes (
     id uuid primary key default gen_random_uuid(),

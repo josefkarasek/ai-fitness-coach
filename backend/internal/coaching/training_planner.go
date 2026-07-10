@@ -103,15 +103,23 @@ type TrainingPlanResult struct {
 
 type TrainingPlannerService struct {
 	store      TrainingPlanStore
-	planner    ai.TrainingPlanner
+	access     AIAccessStore
+	freeAI     ai.TrainingPlanner
+	paidAI     ai.TrainingPlanner
 	dailyLimit int
 	now        func() time.Time
 }
 
 func NewTrainingPlannerService(store TrainingPlanStore, planner ai.TrainingPlanner, dailyLimit int) *TrainingPlannerService {
+	return NewTrainingPlannerServiceWithAccessControl(store, nil, planner, planner, dailyLimit)
+}
+
+func NewTrainingPlannerServiceWithAccessControl(store TrainingPlanStore, access AIAccessStore, freeAI ai.TrainingPlanner, paidAI ai.TrainingPlanner, dailyLimit int) *TrainingPlannerService {
 	return &TrainingPlannerService{
 		store:      store,
-		planner:    planner,
+		access:     access,
+		freeAI:     freeAI,
+		paidAI:     paidAI,
 		dailyLimit: dailyLimit,
 		now:        time.Now,
 	}
@@ -131,7 +139,12 @@ func (s *TrainingPlannerService) GenerateTrainingPlan(ctx context.Context, user 
 		return TrainingPlanResult{}, fmt.Errorf("summarize training history: %w", err)
 	}
 
-	generated, err := s.planner.GenerateTrainingPlan(ctx, history, request)
+	planner, err := s.plannerForUser(ctx, user)
+	if err != nil {
+		return TrainingPlanResult{}, err
+	}
+
+	generated, err := planner.GenerateTrainingPlan(ctx, history, request)
 	if err != nil {
 		return TrainingPlanResult{}, fmt.Errorf("generate training plan: %w", err)
 	}
@@ -175,7 +188,12 @@ func (s *TrainingPlannerService) GenerateWorkoutForDay(ctx context.Context, user
 		return TrainingPlanResult{}, fmt.Errorf("summarize training history: %w", err)
 	}
 
-	generatedWorkout, err := s.planner.GenerateWorkoutForDay(ctx, history, ai.TrainingDayRequest{
+	planner, err := s.plannerForUser(ctx, user)
+	if err != nil {
+		return TrainingPlanResult{}, err
+	}
+
+	generatedWorkout, err := planner.GenerateWorkoutForDay(ctx, history, ai.TrainingDayRequest{
 		TrainingPlanID:       stored.ID,
 		Objective:            stored.Objective,
 		DurationWeeks:        stored.DurationWeeks,
@@ -213,6 +231,22 @@ func (s *TrainingPlannerService) GenerateWorkoutForDay(ctx context.Context, user
 	}
 
 	return buildTrainingPlanResult(updated, true, s.dailyLimit, generatedToday+1), nil
+}
+
+func (s *TrainingPlannerService) plannerForUser(ctx context.Context, user auth.User) (ai.TrainingPlanner, error) {
+	if s.access == nil {
+		return s.paidAI, nil
+	}
+
+	enabled, err := s.access.HasPaidAIAccessForUser(ctx, user)
+	if err != nil {
+		return nil, fmt.Errorf("check ai access: %w", err)
+	}
+	if enabled {
+		return s.paidAI, nil
+	}
+
+	return s.freeAI, nil
 }
 
 func (s *TrainingPlannerService) MoveWorkout(ctx context.Context, user auth.User, trainingPlanID int64, weekNumber int, fromDayNumber int, toDayNumber int) (TrainingPlanResult, error) {

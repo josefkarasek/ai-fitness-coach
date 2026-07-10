@@ -12,6 +12,22 @@ class CachedPayloadSnapshot {
   final DateTime updatedAt;
 }
 
+class WorkoutSessionDraftCacheEntry {
+  const WorkoutSessionDraftCacheEntry({
+    required this.trainingPlanId,
+    required this.weekNumber,
+    required this.dayNumber,
+    required this.payloadJson,
+    required this.updatedAt,
+  });
+
+  final int trainingPlanId;
+  final int weekNumber;
+  final int dayNumber;
+  final String payloadJson;
+  final DateTime updatedAt;
+}
+
 class DriftLocalCacheRepository {
   DriftLocalCacheRepository(this._database);
 
@@ -21,9 +37,7 @@ class DriftLocalCacheRepository {
     required String firebaseUid,
     required String payloadJson,
   }) async {
-    await _database
-        .into(_database.userProfileCaches)
-        .insertOnConflictUpdate(
+    await _database.into(_database.userProfileCaches).insertOnConflictUpdate(
           UserProfileCachesCompanion(
             firebaseUid: Value<String>(firebaseUid),
             payloadJson: Value<String>(payloadJson),
@@ -35,10 +49,11 @@ class DriftLocalCacheRepository {
   Future<CachedPayloadSnapshot?> loadCachedUserProfile(
     String firebaseUid,
   ) async {
-    final UserProfileCache? row =
-        await (_database.select(_database.userProfileCaches)
-              ..where((UserProfileCaches tbl) => tbl.firebaseUid.equals(firebaseUid)))
-            .getSingleOrNull();
+    final UserProfileCache? row = await (_database
+            .select(_database.userProfileCaches)
+          ..where(
+              (UserProfileCaches tbl) => tbl.firebaseUid.equals(firebaseUid)))
+        .getSingleOrNull();
     if (row == null) {
       return null;
     }
@@ -64,10 +79,12 @@ class DriftLocalCacheRepository {
         );
   }
 
-  Future<CachedPayloadSnapshot?> loadLatestTrainingPlan(String firebaseUid) async {
+  Future<CachedPayloadSnapshot?> loadLatestTrainingPlan(
+      String firebaseUid) async {
     final TrainingPlanCache? row =
         await (_database.select(_database.trainingPlanCaches)
-              ..where((TrainingPlanCaches tbl) => tbl.firebaseUid.equals(firebaseUid))
+              ..where((TrainingPlanCaches tbl) =>
+                  tbl.firebaseUid.equals(firebaseUid))
               ..orderBy(<OrderingTerm Function(TrainingPlanCaches)>[
                 (TrainingPlanCaches tbl) => OrderingTerm.desc(tbl.updatedAt),
               ])
@@ -101,7 +118,8 @@ class DriftLocalCacheRepository {
   Future<CachedPayloadSnapshot?> loadWorkoutLogs(int trainingPlanId) async {
     final WorkoutLogCache? row =
         await (_database.select(_database.workoutLogCaches)
-              ..where((WorkoutLogCaches tbl) => tbl.trainingPlanId.equals(trainingPlanId)))
+              ..where((WorkoutLogCaches tbl) =>
+                  tbl.trainingPlanId.equals(trainingPlanId)))
             .getSingleOrNull();
     if (row == null) {
       return null;
@@ -120,9 +138,7 @@ class DriftLocalCacheRepository {
     required int dayNumber,
     required String payloadJson,
   }) async {
-    await _database
-        .into(_database.workoutSessionDrafts)
-        .insertOnConflictUpdate(
+    await _database.into(_database.workoutSessionDrafts).insertOnConflictUpdate(
           WorkoutSessionDraftsCompanion(
             firebaseUid: Value<String>(firebaseUid),
             trainingPlanId: Value<int>(trainingPlanId),
@@ -158,6 +174,37 @@ class DriftLocalCacheRepository {
       payloadJson: row.payloadJson,
       updatedAt: row.updatedAt,
     );
+  }
+
+  Future<List<WorkoutSessionDraftCacheEntry>> loadWorkoutSessionDrafts({
+    required String firebaseUid,
+    required int trainingPlanId,
+  }) async {
+    final List<WorkoutSessionDraft> rows =
+        await (_database.select(_database.workoutSessionDrafts)
+              ..where(
+                (WorkoutSessionDrafts tbl) =>
+                    tbl.firebaseUid.equals(firebaseUid) &
+                    tbl.trainingPlanId.equals(trainingPlanId),
+              )
+              ..orderBy(<OrderingTerm Function(WorkoutSessionDrafts)>[
+                (WorkoutSessionDrafts tbl) => OrderingTerm.asc(tbl.weekNumber),
+                (WorkoutSessionDrafts tbl) => OrderingTerm.asc(tbl.dayNumber),
+                (WorkoutSessionDrafts tbl) => OrderingTerm.desc(tbl.updatedAt),
+              ]))
+            .get();
+
+    return rows
+        .map(
+          (WorkoutSessionDraft row) => WorkoutSessionDraftCacheEntry(
+            trainingPlanId: row.trainingPlanId,
+            weekNumber: row.weekNumber,
+            dayNumber: row.dayNumber,
+            payloadJson: row.payloadJson,
+            updatedAt: row.updatedAt,
+          ),
+        )
+        .toList(growable: false);
   }
 
   Future<void> clearWorkoutSessionDraft({
@@ -225,19 +272,18 @@ class DriftLocalCacheRepository {
     required String firebaseUid,
     required int trainingPlanId,
   }) async {
-    final List<SyncJob> rows =
-        await (_database.select(_database.syncJobs)
-              ..where(
-                (SyncJobs tbl) =>
-                    tbl.firebaseUid.equals(firebaseUid) &
-                    tbl.entityType.equals('workout_log') &
-                    tbl.trainingPlanId.equals(trainingPlanId) &
-                    tbl.status.equals('pending'),
-              )
-              ..orderBy(<OrderingTerm Function(SyncJobs)>[
-                (SyncJobs tbl) => OrderingTerm.asc(tbl.createdAt),
-              ]))
-            .get();
+    final List<SyncJob> rows = await (_database.select(_database.syncJobs)
+          ..where(
+            (SyncJobs tbl) =>
+                tbl.firebaseUid.equals(firebaseUid) &
+                tbl.entityType.equals('workout_log') &
+                tbl.trainingPlanId.equals(trainingPlanId) &
+                tbl.status.equals('pending'),
+          )
+          ..orderBy(<OrderingTerm Function(SyncJobs)>[
+            (SyncJobs tbl) => OrderingTerm.asc(tbl.createdAt),
+          ]))
+        .get();
 
     return rows
         .map((SyncJob row) => row.localSnapshotJson)
