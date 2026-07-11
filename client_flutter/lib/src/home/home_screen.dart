@@ -31,9 +31,19 @@ const List<String> _storedSessionFeelLabels = <String>[
   'Brutal',
 ];
 
-String _formatVolumeValue(double value) => value.toStringAsFixed(2);
+enum _WorkoutFieldKind {
+  reps,
+  value,
+  loadValue,
+}
 
-String _formatWorkoutFieldNumber(double value) => value.toStringAsFixed(2);
+String _formatTrimmedNumber(double value) {
+  return value.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+}
+
+String _formatVolumeValue(double value) => _formatTrimmedNumber(value);
+
+String _formatWorkoutFieldNumber(double value) => _formatTrimmedNumber(value);
 
 String _formatRepsValue(double value) => value.round().toString();
 
@@ -467,6 +477,7 @@ class _HomeScreenState extends State<HomeScreen>
               (_WorkoutLogItem item) => item.weekNumber == displayedWeekNumber)
           .toList(growable: false),
       _backendUser?.preferredDays ?? const <String>[],
+      displayedWeekNumber == currentWeekNumber,
     );
     final List<_WeekdayWorkoutSlot>? previousWeekSlots = displayedWeekNumber > 1
         ? _weekSlotsForWeek(
@@ -474,6 +485,7 @@ class _HomeScreenState extends State<HomeScreen>
             workoutLogsForPlan,
             displayedWeekNumber - 1,
             _backendUser?.preferredDays ?? const <String>[],
+            currentWeekNumber,
           )
         : null;
     final List<_WeekdayWorkoutSlot>? nextWeekSlots =
@@ -483,6 +495,7 @@ class _HomeScreenState extends State<HomeScreen>
                 workoutLogsForPlan,
                 displayedWeekNumber + 1,
                 _backendUser?.preferredDays ?? const <String>[],
+                currentWeekNumber,
               )
             : null;
     final _WeekdayWorkoutSlot? selectedWeekSlot =
@@ -567,7 +580,6 @@ class _HomeScreenState extends State<HomeScreen>
                                     slots: previousWeekSlots,
                                     selectedWeekday:
                                         selectedWeekSlot?.weekdayLabel,
-                                    currentWeekday: _currentWeekdayLabel(),
                                     onTap: (String weekday) {
                                       setState(() {
                                         _selectedWeekday = weekday;
@@ -586,7 +598,6 @@ class _HomeScreenState extends State<HomeScreen>
                                   slots: currentWeekSlots,
                                   selectedWeekday:
                                       selectedWeekSlot?.weekdayLabel,
-                                  currentWeekday: _currentWeekdayLabel(),
                                   onTap: (String weekday) {
                                     setState(() {
                                       _selectedWeekday = weekday;
@@ -609,7 +620,6 @@ class _HomeScreenState extends State<HomeScreen>
                                     slots: nextWeekSlots,
                                     selectedWeekday:
                                         selectedWeekSlot?.weekdayLabel,
-                                    currentWeekday: _currentWeekdayLabel(),
                                     onTap: (String weekday) {
                                       setState(() {
                                         _selectedWeekday = weekday;
@@ -1235,6 +1245,7 @@ class _HomeScreenState extends State<HomeScreen>
     _TrainingPlanWeek? currentWeek,
     List<_WorkoutLogItem> workoutLogs,
     List<String> preferredDays,
+    bool isDisplayedCurrentWeek,
   ) {
     final List<String> orderedPreferredDays =
         _weekdayOptions.where(preferredDays.contains).toList(growable: false);
@@ -1266,6 +1277,7 @@ class _HomeScreenState extends State<HomeScreen>
       return _WeekdayWorkoutSlot(
         weekdayLabel: label,
         weekdayIndex: i + 1,
+        isCurrentDay: isDisplayedCurrentWeek && DateTime.now().weekday == i + 1,
         workout: workout,
         loggedWorkout:
             workout == null ? null : logsByDayNumber[workout.dayNumber],
@@ -1285,6 +1297,7 @@ class _HomeScreenState extends State<HomeScreen>
     List<_WorkoutLogItem> workoutLogs,
     int weekNumber,
     List<String> preferredDays,
+    int actualCurrentWeekNumber,
   ) {
     final _TrainingPlanWeek? week = _currentWeek(plan, weekNumber);
     return _currentWeekSlots(
@@ -1293,6 +1306,7 @@ class _HomeScreenState extends State<HomeScreen>
           .where((_WorkoutLogItem item) => item.weekNumber == weekNumber)
           .toList(growable: false),
       preferredDays,
+      weekNumber == actualCurrentWeekNumber,
     );
   }
 
@@ -2385,6 +2399,7 @@ class _HomeScreenState extends State<HomeScreen>
           .where((_WorkoutLogItem item) => item.weekNumber == currentWeekNumber)
           .toList(growable: false),
       _backendUser?.preferredDays ?? const <String>[],
+      true,
     );
     final List<_WeekdayWorkoutSlot> candidates = slots
         .where(
@@ -4410,14 +4425,12 @@ class _WeekdayWorkoutStrip extends StatelessWidget {
   const _WeekdayWorkoutStrip({
     required this.slots,
     required this.selectedWeekday,
-    required this.currentWeekday,
     required this.onTap,
     required this.onLongPress,
   });
 
   final List<_WeekdayWorkoutSlot> slots;
   final String? selectedWeekday;
-  final String currentWeekday;
   final ValueChanged<String> onTap;
   final ValueChanged<_WeekdayWorkoutSlot> onLongPress;
 
@@ -4440,7 +4453,7 @@ class _WeekdayWorkoutStrip extends StatelessWidget {
             onLongPress: () => onLongPress(slot),
             child: _WeekdayCircle(
               slot: slot,
-              isCurrentDay: slot.weekdayLabel == currentWeekday,
+              isCurrentDay: slot.isCurrentDay,
               isSelected: isSelected,
             ),
           );
@@ -5215,18 +5228,6 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
                                           decoration: const BoxDecoration(
                                             color: Color(0xFFFFD166),
                                             shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                      ],
-                                      if (week.weekNumber ==
-                                          _selectedWeekNumber) ...<Widget>[
-                                        const SizedBox(width: 8),
-                                        const Text(
-                                          'selected',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: _textMuted,
                                           ),
                                         ),
                                       ],
@@ -6091,10 +6092,10 @@ class _WorkoutCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _surface,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _outline),
       ),
       child: Column(
@@ -6691,6 +6692,7 @@ class _WeekdayWorkoutSlot {
   const _WeekdayWorkoutSlot({
     required this.weekdayLabel,
     required this.weekdayIndex,
+    required this.isCurrentDay,
     required this.workout,
     required this.loggedWorkout,
     required this.draftSummary,
@@ -6698,12 +6700,12 @@ class _WeekdayWorkoutSlot {
 
   final String weekdayLabel;
   final int weekdayIndex;
+  final bool isCurrentDay;
   final _TrainingPlanWorkout? workout;
   final _WorkoutLogItem? loggedWorkout;
   final _WorkoutSessionDraftSummary? draftSummary;
 
   bool get hasWorkout => workout != null;
-  bool get isCurrentDay => DateTime.now().weekday == weekdayIndex;
   bool get hasDraft => draftSummary != null;
 }
 
@@ -6978,7 +6980,7 @@ class _WorkoutReviewScreen extends StatelessWidget {
                             )
                           else
                             const Text(
-                              'No extra coach note was added for this session.',
+                              'No extra athlete note was added for this session.',
                               style: TextStyle(
                                 fontSize: 15,
                                 height: 1.5,
@@ -7163,6 +7165,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
   Timer? _elapsedTicker;
   Timer? _draftPersistDebounce;
   Duration _elapsed = Duration.zero;
+  bool _hasManualDurationOverride = false;
   int _currentStep = 0;
   int _sessionFeelIndex = 1;
   double _stepDragDistance = 0;
@@ -7192,24 +7195,21 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
         '';
     final _ParsedSessionFeedback initialFeedback =
         _parseSessionFeedback(initialSessionNotes);
+    final int? initialDurationMinutes = initialDraftSnapshot?.durationMinutes ??
+        widget.existingLog?.durationMinutes;
     _durationController = TextEditingController(
-      text: (initialDraftSnapshot?.durationMinutes ??
-                  widget.existingLog?.durationMinutes)
-              ?.toString() ??
-          '60',
+      text: initialDurationMinutes?.toString() ?? '0',
     );
     _sessionNotesController = TextEditingController(
       text: initialFeedback.note,
     );
+    _hasManualDurationOverride = widget.existingLog != null;
     _sessionFeelIndex =
         initialDraftSnapshot?.sessionFeelIndex ?? initialFeedback.feelIndex;
     _currentStep = initialDraftSnapshot?.currentStep ?? 0;
     _exercises = _buildInitialExercises();
     _exerciseGroups = _buildExerciseGroups(_exercises);
-    final int initialMinutes = initialDraftSnapshot?.durationMinutes ??
-        widget.existingLog?.durationMinutes ??
-        int.tryParse(_durationController.text.trim()) ??
-        0;
+    final int initialMinutes = initialDurationMinutes ?? 0;
     _startedAt = DateTime.now().subtract(Duration(minutes: initialMinutes));
     _elapsed = DateTime.now().difference(_startedAt);
     _elapsedTicker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -7770,7 +7770,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const _SectionTitle('Anything to tell your coach?'),
+                const _SectionTitle('Athlete note'),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _sessionNotesController,
@@ -7889,10 +7889,10 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _surface,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _outline),
       ),
       child: Column(
@@ -7901,27 +7901,31 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
           Text(
             exercise.title,
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: 17,
               fontWeight: FontWeight.w700,
               color: _textPrimary,
             ),
           ),
           if (exercise.notes.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               exercise.notes,
-              style: const TextStyle(color: _textSecondary),
+              style: const TextStyle(
+                fontSize: 13,
+                color: _textSecondary,
+              ),
             ),
           ],
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Row(
             children: <Widget>[
-              const SizedBox(width: 44),
+              const SizedBox(width: 36),
               const Spacer(),
               Checkbox(
                 value: allSetsCompleted,
                 activeColor: _accentGreen,
                 checkColor: _bgTop,
+                visualDensity: VisualDensity.compact,
                 onChanged: (bool? value) {
                   final bool nextValue = value ?? false;
                   setState(() {
@@ -7937,7 +7941,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           for (int setIndex = 0; setIndex < exercise.sets.length; setIndex++)
             Builder(
               builder: (BuildContext context) {
@@ -7950,14 +7954,15 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
                     set.reps.isNotEmpty;
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
                     children: <Widget>[
                       SizedBox(
-                        width: 44,
+                        width: 36,
                         child: Text(
                           'S${setIndex + 1}',
                           style: const TextStyle(
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: _textMuted,
                           ),
@@ -7965,65 +7970,58 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
                       ),
                       if (showRepsField)
                         Expanded(
-                          child: TextFormField(
-                            initialValue: set.reps,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
+                          child: _WorkoutNumericInput(
+                            label: 'Reps',
+                            value: set.reps,
+                            onTap: () => _editWorkoutField(
+                              exerciseIndex: exerciseIndex,
+                              setIndex: setIndex,
+                              fieldKind: _WorkoutFieldKind.reps,
+                              label: 'Reps',
+                              initialValue: set.reps,
                             ),
-                            decoration: const InputDecoration(
-                              labelText: 'Reps',
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (String value) {
-                              exercise.sets[setIndex] =
-                                  exercise.sets[setIndex].copyWith(reps: value);
-                              _scheduleDraftPersist();
-                            },
                           ),
                         ),
                       if (showRepsField && showValueField)
                         const SizedBox(width: 8),
                       if (showValueField)
                         Expanded(
-                          child: TextFormField(
-                            initialValue: set.value,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
+                          child: _WorkoutNumericInput(
+                            label: set.unit,
+                            value: set.value,
+                            onTap: () => _editWorkoutField(
+                              exerciseIndex: exerciseIndex,
+                              setIndex: setIndex,
+                              fieldKind: _WorkoutFieldKind.value,
+                              label: set.unit,
+                              initialValue: set.value,
+                              allowFillRemaining: _isTrackedLoadUnit(
+                                      set.unit) ||
+                                  _isStandalonePrimaryMeasurementUnit(set.unit),
                             ),
-                            decoration: InputDecoration(
-                              labelText: set.unit,
-                              border: const OutlineInputBorder(),
-                            ),
-                            onChanged: (String value) {
-                              exercise.sets[setIndex] = exercise.sets[setIndex]
-                                  .copyWith(value: value);
-                              _scheduleDraftPersist();
-                            },
                           ),
                         ),
                       if (showRepsField || showValueField)
                         const SizedBox(width: 8),
                       if (showLoadField)
                         Expanded(
-                          child: TextFormField(
-                            initialValue: set.loadValue,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
+                          child: _WorkoutNumericInput(
+                            label: set.loadUnit,
+                            value: set.loadValue,
+                            onTap: () => _editWorkoutField(
+                              exerciseIndex: exerciseIndex,
+                              setIndex: setIndex,
+                              fieldKind: _WorkoutFieldKind.loadValue,
+                              label: set.loadUnit,
+                              initialValue: set.loadValue,
+                              allowFillRemaining: true,
                             ),
-                            decoration: InputDecoration(
-                              labelText: '${set.loadUnit}',
-                              border: const OutlineInputBorder(),
-                            ),
-                            onChanged: (String value) {
-                              exercise.sets[setIndex] = exercise.sets[setIndex]
-                                  .copyWith(loadValue: value);
-                              _scheduleDraftPersist();
-                            },
                           ),
                         ),
                       if (showLoadField) const SizedBox(width: 8),
                       Checkbox(
                         value: set.completed,
+                        visualDensity: VisualDensity.compact,
                         onChanged: (bool? value) {
                           setState(() {
                             exercise.sets[setIndex] =
@@ -8040,9 +8038,32 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
               },
             ),
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              OutlinedButton(
-                onPressed: () {
+              const SizedBox(width: 8),
+              _WorkoutSetCountButton(
+                icon: Icons.remove_rounded,
+                onTap: exercise.sets.length > 1
+                    ? () {
+                        setState(() {
+                          exercise.sets.removeLast();
+                        });
+                        _scheduleDraftPersist();
+                      }
+                    : null,
+              ),
+              const Text(
+                'Sets',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _textMuted,
+                ),
+              ),
+              const SizedBox(width: 6),
+              _WorkoutSetCountButton(
+                icon: Icons.add_rounded,
+                onTap: () {
                   final String nextUnit =
                       exercise.sets.isEmpty ? '' : exercise.sets.last.unit;
                   setState(() {
@@ -8062,19 +8083,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
                   });
                   _scheduleDraftPersist();
                 },
-                child: const Text('Add Set'),
               ),
-              const SizedBox(width: 10),
-              if (exercise.sets.length > 1)
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      exercise.sets.removeLast();
-                    });
-                    _scheduleDraftPersist();
-                  },
-                  child: const Text('Remove Last Set'),
-                ),
             ],
           ),
         ],
@@ -8150,6 +8159,57 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
     }
 
     _animateStepBack();
+  }
+
+  Future<void> _editWorkoutField({
+    required int exerciseIndex,
+    required int setIndex,
+    required _WorkoutFieldKind fieldKind,
+    required String label,
+    required String initialValue,
+    bool allowFillRemaining = false,
+  }) async {
+    final _WorkoutFieldEditResult? result =
+        await showModalBottomSheet<_WorkoutFieldEditResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return _WorkoutFieldKeyboardSheet(
+          title: _exercises[exerciseIndex].title,
+          label: label,
+          initialValue: initialValue,
+          allowFillRemaining: allowFillRemaining,
+        );
+      },
+    );
+
+    if (result == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      final List<_WorkoutLogSetDraftState> updatedSets =
+          List<_WorkoutLogSetDraftState>.from(_exercises[exerciseIndex].sets);
+      final int endIndex =
+          result.fillRemaining ? updatedSets.length - 1 : setIndex;
+      for (int index = setIndex; index <= endIndex; index++) {
+        final _WorkoutLogSetDraftState current = updatedSets[index];
+        switch (fieldKind) {
+          case _WorkoutFieldKind.reps:
+            updatedSets[index] = current.copyWith(reps: result.value);
+            break;
+          case _WorkoutFieldKind.value:
+            updatedSets[index] = current.copyWith(value: result.value);
+            break;
+          case _WorkoutFieldKind.loadValue:
+            updatedSets[index] = current.copyWith(loadValue: result.value);
+            break;
+        }
+      }
+      _exercises[exerciseIndex].sets = updatedSets;
+    });
+    _scheduleDraftPersist();
   }
 
   void _finishSession() {
@@ -8270,9 +8330,18 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
     _syncElapsedMinutes(_elapsed.inMinutes + deltaMinutes);
   }
 
+  int get _effectiveDurationMinutes {
+    if (_hasManualDurationOverride) {
+      return int.tryParse(_durationController.text.trim()) ??
+          _elapsed.inMinutes;
+    }
+    return _elapsed.inMinutes;
+  }
+
   void _syncElapsedMinutes(int minutes) {
     final int safeMinutes = math.max(0, minutes);
     setState(() {
+      _hasManualDurationOverride = true;
       _startedAt = DateTime.now().subtract(Duration(minutes: safeMinutes));
       _elapsed = Duration(minutes: safeMinutes);
       _durationController.text = '$safeMinutes';
@@ -8306,7 +8375,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
     }
 
     final RegExp prefixedPattern = RegExp(
-      r'^Session feel:\s*(Easy|Good|Hard|Brutal)\.?(?:\s*Coach note:\s*(.*))?$',
+      r'^Session feel:\s*(Easy|Good|Hard|Brutal)\.?(?:\s*(?:Athlete|Coach) note:\s*(.*))?$',
       caseSensitive: false,
       dotAll: true,
     );
@@ -8406,7 +8475,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
     if (sanitizedNote.isEmpty) {
       return 'Session feel: $feel.';
     }
-    return 'Session feel: $feel. Coach note: $sanitizedNote';
+    return 'Session feel: $feel. Athlete note: $sanitizedNote';
   }
 
   _WorkoutSummary _buildSummary() {
@@ -8438,8 +8507,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
     }
 
     return _WorkoutSummary(
-      durationMinutes:
-          int.tryParse(_durationController.text.trim()) ?? _elapsed.inMinutes,
+      durationMinutes: _effectiveDurationMinutes,
       totalSets: totalSets,
       completedSets: completedSets,
       totalReps: totalReps,
@@ -8524,15 +8592,13 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
       if (summary.hasEstimatedVolume)
         'Completed tracked volume landed around ${_formatVolumeValue(summary.estimatedVolume!)} ${summary.estimatedVolumeUnit}.',
       if (summary.athleteFeedback.isNotEmpty)
-        'Your session note is ready to be folded into the coach review after save.',
+        'Your athlete note is ready to be folded into the coach review after save.',
     ];
 
     return sentences.join(' ');
   }
 
   _WorkoutLogDraft _buildDraft() {
-    final int? durationMinutes = int.tryParse(_durationController.text.trim());
-
     return _WorkoutLogDraft(
       trainingPlanID: widget.plan.planID,
       weekNumber: widget.workout.weekNumber,
@@ -8540,7 +8606,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
       title: widget.workout.title,
       focus: widget.workout.focus,
       sessionNotes: _composeSessionNotes(),
-      durationMinutes: durationMinutes ?? _elapsed.inMinutes,
+      durationMinutes: _effectiveDurationMinutes,
       exercises: _exercises.map((_WorkoutLogExerciseDraftState exercise) {
         return _WorkoutLogDraftExercise(
           title: exercise.title,
@@ -8568,8 +8634,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
       title: widget.workout.title,
       focus: widget.workout.focus,
       sessionNotes: _composeSessionNotes(),
-      durationMinutes:
-          int.tryParse(_durationController.text.trim()) ?? _elapsed.inMinutes,
+      durationMinutes: _effectiveDurationMinutes,
       currentStep: _currentStep,
       sessionFeelIndex: _sessionFeelIndex,
       exercises: _exercises.map((_WorkoutLogExerciseDraftState exercise) {
@@ -9371,6 +9436,374 @@ class _WorkoutLogDraftSet {
       'load_unit': loadUnit,
       'completed': completed,
     };
+  }
+}
+
+class _WorkoutFieldEditResult {
+  const _WorkoutFieldEditResult({
+    required this.value,
+    required this.fillRemaining,
+  });
+
+  final String value;
+  final bool fillRemaining;
+}
+
+class _WorkoutNumericInput extends StatelessWidget {
+  const _WorkoutNumericInput({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final String displayValue = value.trim().isEmpty ? '0' : value.trim();
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: _surfaceRaised,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _outlineSoft),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              label.isEmpty ? 'Value' : label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: _textMuted,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              displayValue,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: value.trim().isEmpty ? _textMuted : _textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkoutFieldKeyboardSheet extends StatefulWidget {
+  const _WorkoutFieldKeyboardSheet({
+    required this.title,
+    required this.label,
+    required this.initialValue,
+    required this.allowFillRemaining,
+  });
+
+  final String title;
+  final String label;
+  final String initialValue;
+  final bool allowFillRemaining;
+
+  @override
+  State<_WorkoutFieldKeyboardSheet> createState() =>
+      _WorkoutFieldKeyboardSheetState();
+}
+
+class _WorkoutFieldKeyboardSheetState
+    extends State<_WorkoutFieldKeyboardSheet> {
+  late String _value;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.initialValue.trim();
+  }
+
+  void _append(String token) {
+    setState(() {
+      if (token == '.' && _value.contains('.')) {
+        return;
+      }
+      if (token == '.' && _value.isEmpty) {
+        _value = '0.';
+        return;
+      }
+      _value = '$_value$token';
+    });
+  }
+
+  void _backspace() {
+    if (_value.isEmpty) {
+      return;
+    }
+    setState(() {
+      _value = _value.substring(0, _value.length - 1);
+    });
+  }
+
+  void _clear() {
+    setState(() {
+      _value = '';
+    });
+  }
+
+  void _submit({required bool fillRemaining}) {
+    Navigator.of(context).pop(
+      _WorkoutFieldEditResult(
+        value: _value.trim(),
+        fillRemaining: fillRemaining,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12, 8, 12, bottomInset + 8),
+      child: Material(
+        color: _surface,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: _textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.label.isEmpty ? 'Value' : widget.label,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 84),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _surfaceRaised,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _outlineSoft),
+                    ),
+                    child: Text(
+                      _value.isEmpty ? '0' : _value,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: _value.isEmpty ? _textMuted : _textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: <Widget>[
+                    _WorkoutKeyboardActionChip(
+                      label: 'Clear',
+                      onTap: _clear,
+                    ),
+                    if (widget.allowFillRemaining) ...<Widget>[
+                      const SizedBox(width: 8),
+                      _WorkoutKeyboardActionChip(
+                        label: 'Fill remaining',
+                        onTap: () => _submit(fillRemaining: true),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              GridView.count(
+                crossAxisCount: 4,
+                shrinkWrap: true,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1.9,
+                physics: const NeverScrollableScrollPhysics(),
+                children: <Widget>[
+                  for (final String token in <String>[
+                    '1',
+                    '2',
+                    '3',
+                    '⌫',
+                    '4',
+                    '5',
+                    '6',
+                    '.',
+                    '7',
+                    '8',
+                    '9',
+                    '0',
+                    '',
+                    '',
+                    '',
+                  ])
+                    token.isEmpty
+                        ? const SizedBox.shrink()
+                        : _WorkoutKeyboardKey(
+                            label: token,
+                            onTap: token == '⌫'
+                                ? _backspace
+                                : () => _append(token),
+                          ),
+                  _WorkoutKeyboardKey(
+                    label: 'OK',
+                    filled: true,
+                    onTap: () => _submit(fillRemaining: false),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkoutKeyboardActionChip extends StatelessWidget {
+  const _WorkoutKeyboardActionChip({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: _surfaceRaised,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: _outlineSoft),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: _textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkoutKeyboardKey extends StatelessWidget {
+  const _WorkoutKeyboardKey({
+    required this.label,
+    required this.onTap,
+    this.filled = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: filled ? _accentGreen : _surfaceRaised,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: filled ? _accentGreen : _outlineSoft,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: filled ? _bgTop : _textPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkoutSetCountButton extends StatelessWidget {
+  const _WorkoutSetCountButton({
+    required this.icon,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled = onTap != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Ink(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: enabled ? _surfaceRaised : _surfaceAlt,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: enabled ? _outlineSoft : _outline,
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: enabled ? _textPrimary : _textMuted,
+        ),
+      ),
+    );
   }
 }
 
