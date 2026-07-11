@@ -745,19 +745,6 @@ class _HomeScreenState extends State<HomeScreen>
                   _CoachStatusBanner(message: _status!),
                 ],
                 const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Expanded(
-                      child: _MetricCard(
-                        eyebrow: 'Next Milestone',
-                        title: _milestoneTitle(plan, upcomingWorkout),
-                        body: _milestoneBody(plan, completedWorkouts),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
                 _Card(
                   child: Wrap(
                     spacing: 10,
@@ -1562,29 +1549,6 @@ class _HomeScreenState extends State<HomeScreen>
     return parts.join(' ');
   }
 
-  String _milestoneTitle(
-    _TrainingPlanResult? plan,
-    _UpcomingWorkoutData? upcomingWorkout,
-  ) {
-    if (upcomingWorkout != null && upcomingWorkout.exercises.isNotEmpty) {
-      return upcomingWorkout.exercises.first;
-    }
-    if (plan != null && plan.objective.isNotEmpty) {
-      return 'Block outcome';
-    }
-    return 'First plan';
-  }
-
-  String _milestoneBody(_TrainingPlanResult? plan, int completedWorkouts) {
-    if (plan == null) {
-      return 'Sign in, import history, and generate a block.';
-    }
-
-    final int remaining =
-        math.max(plan.totalPlannedWorkouts - completedWorkouts, 0);
-    return '$remaining sessions remain in this block. ${_firstSentence(plan.successCriteria)}';
-  }
-
   String _firstSentence(String text) {
     final String trimmed = text.trim();
     if (trimmed.isEmpty) {
@@ -1662,10 +1626,8 @@ class _HomeScreenState extends State<HomeScreen>
   ) async {
     final _TrainingPlanWorkout? plannedWorkout =
         plan.findWorkout(savedLog.weekNumber, savedLog.dayNumber);
-    final _WorkoutReviewDetails reviewDetails = _buildWorkoutReviewDetails(
-      plannedWorkout,
-      savedLog,
-    );
+    final _WorkoutReviewDetails reviewDetails =
+        _buildWorkoutReviewDetails(savedLog);
 
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -1711,107 +1673,16 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  _PlannedVsActualSummary _buildPlannedVsActualSummaryForLog(
-    _TrainingPlanWorkout? plannedWorkout,
-    _WorkoutLogItem savedLog,
-  ) {
-    final List<_PlannedExercise> plannedExercises =
-        plannedWorkout?.exercises ?? const <_PlannedExercise>[];
-    int plannedSetCount = 0;
-    int completedPlannedSets = 0;
-    int adjustedSetCount = 0;
-
-    final int exerciseCount =
-        math.max(plannedExercises.length, savedLog.exercises.length);
-    for (int exerciseIndex = 0;
-        exerciseIndex < exerciseCount;
-        exerciseIndex++) {
-      final _PlannedExercise? plannedExercise =
-          exerciseIndex < plannedExercises.length
-              ? plannedExercises[exerciseIndex]
-              : null;
-      final _WorkoutLogExerciseItem? actualExercise =
-          exerciseIndex < savedLog.exercises.length
-              ? savedLog.exercises[exerciseIndex]
-              : null;
-      final int setCount = math.max(
-        plannedExercise?.sets.length ?? 0,
-        actualExercise?.sets.length ?? 0,
-      );
-
-      for (int setIndex = 0; setIndex < setCount; setIndex++) {
-        final _PlannedSet? plannedSet =
-            plannedExercise != null && setIndex < plannedExercise.sets.length
-                ? plannedExercise.sets[setIndex]
-                : null;
-        final _WorkoutLogSetItem? actualSet =
-            actualExercise != null && setIndex < actualExercise.sets.length
-                ? actualExercise.sets[setIndex]
-                : null;
-
-        if (plannedSet != null) {
-          plannedSetCount++;
-          if (actualSet?.completed == true) {
-            completedPlannedSets++;
-          }
-        }
-
-        final bool changed = _setDiffersFromPlan(plannedSet, actualSet);
-        if (changed) {
-          adjustedSetCount++;
-        }
-      }
-    }
-
-    return _PlannedVsActualSummary(
-      plannedSetCount: plannedSetCount,
-      completedPlannedSets: completedPlannedSets,
-      adjustedSetCount: adjustedSetCount,
-    );
-  }
-
-  _WorkoutReviewDetails _buildWorkoutReviewDetails(
-    _TrainingPlanWorkout? plannedWorkout,
-    _WorkoutLogItem savedLog,
-  ) {
-    final _PlannedVsActualSummary comparison =
-        _buildPlannedVsActualSummaryForLog(plannedWorkout, savedLog);
+  _WorkoutReviewDetails _buildWorkoutReviewDetails(_WorkoutLogItem savedLog) {
     final _ParsedSessionFeedback parsedFeedback =
         _parseStoredSessionFeedback(savedLog.sessionNotes);
 
-    double plannedReps = 0;
-    final Map<String, double> plannedVolumeByUnit = <String, double>{};
-    for (final _PlannedExercise exercise
-        in plannedWorkout?.exercises ?? const <_PlannedExercise>[]) {
-      for (final _PlannedSet set in exercise.sets) {
-        if (set.reps != null) {
-          plannedReps += set.reps!;
-        }
-        _appendPlannedTrackedVolume(plannedVolumeByUnit, set);
-      }
-    }
-
-    String plannedVolumeUnit = '';
-    double? plannedVolume;
-    if (plannedVolumeByUnit.isNotEmpty) {
-      final List<MapEntry<String, double>> sortedEntries =
-          plannedVolumeByUnit.entries.toList()
-            ..sort(
-              (MapEntry<String, double> a, MapEntry<String, double> b) =>
-                  b.value.compareTo(a.value),
-            );
-      plannedVolumeUnit = sortedEntries.first.key;
-      plannedVolume = sortedEntries.first.value;
-    }
-
     return _WorkoutReviewDetails(
-      comparison: comparison,
-      plannedReps: plannedReps,
-      actualReps: savedLog.totalReps,
-      plannedVolume: plannedVolume,
-      plannedVolumeUnit: plannedVolumeUnit,
-      actualVolume: savedLog.estimatedVolume,
-      actualVolumeUnit: savedLog.estimatedVolumeUnit,
+      setCount: savedLog.setCount,
+      completedSetCount: savedLog.completedSetCount,
+      totalReps: savedLog.totalReps,
+      estimatedVolume: savedLog.estimatedVolume,
+      estimatedVolumeUnit: savedLog.estimatedVolumeUnit,
       parsedFeedback: parsedFeedback,
     );
   }
@@ -5869,7 +5740,7 @@ class _MetricCard extends StatelessWidget {
   const _MetricCard({
     required this.eyebrow,
     required this.title,
-    required this.body,
+    this.body = '',
   });
 
   final String eyebrow;
@@ -5906,15 +5777,17 @@ class _MetricCard extends StatelessWidget {
               color: _textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            body,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.45,
-              color: _textSecondary,
+          if (body.trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(
+              body,
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.45,
+                color: _textSecondary,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -6642,30 +6515,6 @@ class _PlannedSet {
   final String loadUnit;
 }
 
-bool _setDiffersFromPlan(_PlannedSet? planned, _WorkoutLogSetItem? actual) {
-  if (planned == null || actual == null) {
-    return true;
-  }
-
-  bool sameNumber(double? a, double? b) {
-    if (a == null && b == null) {
-      return true;
-    }
-    if (a == null || b == null) {
-      return false;
-    }
-    return (a - b).abs() < 0.001;
-  }
-
-  return !sameNumber(planned.reps, actual.reps) ||
-      !sameNumber(planned.targetValue, actual.value) ||
-      !sameNumber(planned.loadValue, actual.loadValue) ||
-      planned.targetUnit.trim().toLowerCase() !=
-          actual.unit.trim().toLowerCase() ||
-      planned.loadUnit.trim().toLowerCase() !=
-          actual.loadUnit.trim().toLowerCase();
-}
-
 class _UpcomingWorkoutData {
   const _UpcomingWorkoutData({
     required this.relativeLabel,
@@ -6877,47 +6726,42 @@ class _WorkoutReviewScreen extends StatelessWidget {
                       child: _MetricCard(
                         eyebrow: 'Sets',
                         title:
-                            '${reviewDetails.comparison.completedPlannedSets}/${reviewDetails.comparison.plannedSetCount}',
-                        body: 'Planned sets fully checked off.',
+                            '${reviewDetails.completedSetCount}/${reviewDetails.setCount}',
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(
-                      child: _MetricCard(
-                        eyebrow: 'Adjustments',
-                        title: '${reviewDetails.comparison.adjustedSetCount}',
-                        body: 'Prescription changes logged mid-session.',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: <Widget>[
                     Expanded(
                       child: _MetricCard(
                         eyebrow: 'Reps',
-                        title:
-                            '${reviewDetails.actualReps.round()} / ${reviewDetails.plannedReps.round()}',
-                        body: 'Actual vs planned reps for this session.',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _MetricCard(
-                        eyebrow: 'Volume',
-                        title: reviewDetails.volumeHeadline,
-                        body: reviewDetails.volumeBody,
+                        title: '${reviewDetails.totalReps.round()}',
                       ),
                     ),
                   ],
                 ),
-                if (savedLog.durationMinutes != null) ...<Widget>[
+                if (reviewDetails.hasEstimatedVolume ||
+                    savedLog.durationMinutes != null) ...<Widget>[
                   const SizedBox(height: 12),
-                  _MetricCard(
-                    eyebrow: 'Duration',
-                    title: '${savedLog.durationMinutes} min',
-                    body: 'Session time saved back to the coach.',
+                  Row(
+                    children: <Widget>[
+                      if (reviewDetails.hasEstimatedVolume)
+                        Expanded(
+                          child: _MetricCard(
+                            eyebrow: 'Volume',
+                            title:
+                                '${_formatVolumeValue(reviewDetails.estimatedVolume!)} ${reviewDetails.estimatedVolumeUnit}',
+                          ),
+                        ),
+                      if (reviewDetails.hasEstimatedVolume &&
+                          savedLog.durationMinutes != null)
+                        const SizedBox(width: 12),
+                      if (savedLog.durationMinutes != null)
+                        Expanded(
+                          child: _MetricCard(
+                            eyebrow: 'Duration',
+                            title: '${savedLog.durationMinutes} min',
+                          ),
+                        ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -6925,30 +6769,9 @@ class _WorkoutReviewScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      const _SectionTitle('Planned vs Actual'),
+                      const _SectionTitle('Intensity'),
                       const SizedBox(height: 12),
-                      Text(
-                        _reviewNarrative(reviewDetails),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          height: 1.6,
-                          color: _textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _Card(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      const _SectionTitle('How It Felt'),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        crossAxisAlignment: WrapCrossAlignment.center,
+                      Row(
                         children: <Widget>[
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -6960,35 +6783,40 @@ class _WorkoutReviewScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(color: _outline),
                             ),
-                            child: Text(
-                              reviewDetails.feelLabel,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: _textPrimary,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                Icon(
+                                  _intensityIcon(reviewDetails.feelLabel),
+                                  size: 16,
+                                  color: _textPrimary,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  reviewDetails.feelLabel,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: _textPrimary,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          if (reviewDetails.parsedFeedback.note.isNotEmpty)
-                            Text(
-                              reviewDetails.parsedFeedback.note,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                height: 1.5,
-                                color: _textSecondary,
-                              ),
-                            )
-                          else
-                            const Text(
-                              'No extra athlete note was added for this session.',
-                              style: TextStyle(
-                                fontSize: 15,
-                                height: 1.5,
-                                color: _textMuted,
-                              ),
-                            ),
                         ],
                       ),
+                      if (reviewDetails
+                          .parsedFeedback.note.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 12),
+                        Text(
+                          reviewDetails.parsedFeedback.note,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            height: 1.5,
+                            color: _textSecondary,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -7085,21 +6913,19 @@ class _WorkoutReviewScreen extends StatelessWidget {
     );
   }
 
-  String _reviewNarrative(_WorkoutReviewDetails details) {
-    final List<String> sentences = <String>[
-      'You completed ${details.comparison.completedPlannedSets} of ${details.comparison.plannedSetCount} written sets and logged ${details.actualReps.round()} total reps against ${details.plannedReps.round()} planned reps.',
-      if (details.comparison.adjustedSetCount > 0)
-        '${details.comparison.adjustedSetCount} set entries drifted away from the original prescription, which is useful context for future coaching decisions.'
-      else
-        'You stayed close to the written prescription, which gives the coach a clean signal for progression.',
-      if (details.hasComparableVolume)
-        'Tracked volume landed at ${_formatVolumeValue(details.actualVolume!)} ${details.actualVolumeUnit} versus a planned ${_formatVolumeValue(details.plannedVolume!)} ${details.plannedVolumeUnit}.',
-      if (!details.hasComparableVolume &&
-          details.actualVolume != null &&
-          details.actualVolumeUnit.isNotEmpty)
-        'You still logged ${_formatVolumeValue(details.actualVolume!)} ${details.actualVolumeUnit} of measurable work for this session.',
-    ];
-    return sentences.join(' ');
+  IconData _intensityIcon(String feelLabel) {
+    switch (feelLabel.trim().toLowerCase()) {
+      case 'easy':
+        return Icons.sentiment_satisfied_alt_rounded;
+      case 'good':
+        return Icons.check_circle_rounded;
+      case 'hard':
+        return Icons.fitness_center_rounded;
+      case 'brutal':
+        return Icons.local_fire_department_rounded;
+      default:
+        return Icons.bolt_rounded;
+    }
   }
 
   String _exerciseReviewSummary(
@@ -7801,8 +7627,6 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
 
   Widget _buildSummaryStep() {
     final _WorkoutSummary summary = _buildSummary();
-    final _PlannedVsActualSummary plannedVsActual =
-        _buildPlannedVsActualSummary();
     return SingleChildScrollView(
       key: const ValueKey<String>('summary'),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
@@ -7832,33 +7656,46 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
               const SizedBox(width: 12),
               Expanded(
                 child: _MetricCard(
-                  eyebrow: 'Planned Sets',
-                  title:
-                      '${plannedVsActual.completedPlannedSets}/${plannedVsActual.plannedSetCount}',
-                  body:
-                      '${plannedVsActual.adjustedSetCount} prescription changes logged',
+                  eyebrow: 'Sets',
+                  title: '${summary.completedSets}/${summary.totalSets}',
+                  body: 'Completed sets ready to send to your coach.',
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          if (summary.hasEstimatedVolume)
-            _MetricCard(
-              eyebrow: 'Volume',
-              title:
-                  '${_formatVolumeValue(summary.estimatedVolume!)} ${summary.estimatedVolumeUnit}',
-              body:
-                  'Estimated only from completed sets that include a tracked load unit.',
-            ),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _MetricCard(
+                  eyebrow: 'Reps',
+                  title: '${summary.totalReps.round()}',
+                  body: 'Total reps logged across completed sets.',
+                ),
+              ),
+              if (summary.hasEstimatedVolume) ...<Widget>[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _MetricCard(
+                    eyebrow: 'Volume',
+                    title:
+                        '${_formatVolumeValue(summary.estimatedVolume!)} ${summary.estimatedVolumeUnit}',
+                    body:
+                        'Estimated only from completed sets that include a tracked load unit.',
+                  ),
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 16),
           _Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const _SectionTitle('Planned vs Actual'),
+                const _SectionTitle('Coach Handoff'),
                 const SizedBox(height: 12),
                 Text(
-                  _plannedVsActualNarrative(plannedVsActual, summary),
+                  _sessionSummaryNarrative(summary),
                   style: const TextStyle(
                     fontSize: 16,
                     height: 1.6,
@@ -8517,78 +8354,9 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
     );
   }
 
-  _PlannedVsActualSummary _buildPlannedVsActualSummary() {
-    int plannedSetCount = 0;
-    int completedPlannedSets = 0;
-    int adjustedSetCount = 0;
-
-    final int exerciseCount =
-        math.max(widget.workout.plannedExercises.length, _exercises.length);
-    for (int exerciseIndex = 0;
-        exerciseIndex < exerciseCount;
-        exerciseIndex++) {
-      final _PlannedExercise? plannedExercise =
-          exerciseIndex < widget.workout.plannedExercises.length
-              ? widget.workout.plannedExercises[exerciseIndex]
-              : null;
-      final _WorkoutLogExerciseDraftState? actualExercise =
-          exerciseIndex < _exercises.length ? _exercises[exerciseIndex] : null;
-      final int setCount = math.max(
-        plannedExercise?.sets.length ?? 0,
-        actualExercise?.sets.length ?? 0,
-      );
-
-      for (int setIndex = 0; setIndex < setCount; setIndex++) {
-        final _PlannedSet? plannedSet =
-            plannedExercise != null && setIndex < plannedExercise.sets.length
-                ? plannedExercise.sets[setIndex]
-                : null;
-        final _WorkoutLogSetDraftState? actualSet =
-            actualExercise != null && setIndex < actualExercise.sets.length
-                ? actualExercise.sets[setIndex]
-                : null;
-
-        if (plannedSet != null) {
-          plannedSetCount++;
-          if (actualSet?.completed == true) {
-            completedPlannedSets++;
-          }
-        }
-
-        final _WorkoutLogSetItem? actualItem = actualSet == null
-            ? null
-            : _WorkoutLogSetItem(
-                sequenceNumber: setIndex + 1,
-                reps: double.tryParse(actualSet.reps.trim()),
-                value: double.tryParse(actualSet.value.trim()),
-                unit: actualSet.unit,
-                loadValue: double.tryParse(actualSet.loadValue.trim()),
-                loadUnit: actualSet.loadUnit,
-                completed: actualSet.completed,
-              );
-        if (_setDiffersFromPlan(plannedSet, actualItem)) {
-          adjustedSetCount++;
-        }
-      }
-    }
-
-    return _PlannedVsActualSummary(
-      plannedSetCount: plannedSetCount,
-      completedPlannedSets: completedPlannedSets,
-      adjustedSetCount: adjustedSetCount,
-    );
-  }
-
-  String _plannedVsActualNarrative(
-    _PlannedVsActualSummary comparison,
-    _WorkoutSummary summary,
-  ) {
+  String _sessionSummaryNarrative(_WorkoutSummary summary) {
     final List<String> sentences = <String>[
-      'You checked off ${comparison.completedPlannedSets} of ${comparison.plannedSetCount} planned sets and logged ${summary.completedSets} completed sets in total.',
-      if (comparison.adjustedSetCount > 0)
-        '${comparison.adjustedSetCount} set prescriptions changed on the floor, which is useful coaching signal rather than something to hide.'
-      else
-        'You stayed very close to the written prescription, which makes future comparisons cleaner.',
+      'You logged ${summary.completedSets} completed sets out of ${summary.totalSets} total and recorded ${summary.totalReps.round()} reps for the session.',
       if (summary.hasEstimatedVolume)
         'Completed tracked volume landed around ${_formatVolumeValue(summary.estimatedVolume!)} ${summary.estimatedVolumeUnit}.',
       if (summary.athleteFeedback.isNotEmpty)
@@ -9099,85 +8867,32 @@ class _BackendUserProfile {
   final bool aiAccessEnabled;
 }
 
-class _PlannedVsActualSummary {
-  const _PlannedVsActualSummary({
-    required this.plannedSetCount,
-    required this.completedPlannedSets,
-    required this.adjustedSetCount,
-  });
-
-  final int plannedSetCount;
-  final int completedPlannedSets;
-  final int adjustedSetCount;
-}
-
 class _WorkoutReviewDetails {
   const _WorkoutReviewDetails({
-    required this.comparison,
-    required this.plannedReps,
-    required this.actualReps,
-    required this.plannedVolume,
-    required this.plannedVolumeUnit,
-    required this.actualVolume,
-    required this.actualVolumeUnit,
+    required this.setCount,
+    required this.completedSetCount,
+    required this.totalReps,
+    required this.estimatedVolume,
+    required this.estimatedVolumeUnit,
     required this.parsedFeedback,
   });
 
-  final _PlannedVsActualSummary comparison;
-  final double plannedReps;
-  final double actualReps;
-  final double? plannedVolume;
-  final String plannedVolumeUnit;
-  final double? actualVolume;
-  final String actualVolumeUnit;
+  final int setCount;
+  final int completedSetCount;
+  final double totalReps;
+  final double? estimatedVolume;
+  final String estimatedVolumeUnit;
   final _ParsedSessionFeedback parsedFeedback;
 
-  bool get hasComparableVolume =>
-      plannedVolume != null &&
-      plannedVolume! > 0 &&
-      plannedVolumeUnit.isNotEmpty &&
-      actualVolume != null &&
-      actualVolume! > 0 &&
-      actualVolumeUnit == plannedVolumeUnit;
+  bool get hasEstimatedVolume =>
+      estimatedVolume != null &&
+      estimatedVolume! > 0 &&
+      estimatedVolumeUnit.isNotEmpty;
 
   String get feelLabel {
     final int safeIndex =
         parsedFeedback.feelIndex.clamp(0, _storedSessionFeelLabels.length - 1);
     return _storedSessionFeelLabels[safeIndex];
-  }
-
-  String get volumeHeadline {
-    if (hasComparableVolume) {
-      return '${_formatVolumeValue(actualVolume!)} / ${_formatVolumeValue(plannedVolume!)}';
-    }
-    if (actualVolume != null &&
-        actualVolume! > 0 &&
-        actualVolumeUnit.isNotEmpty) {
-      return '${_formatVolumeValue(actualVolume!)} $actualVolumeUnit';
-    }
-    if (plannedVolume != null &&
-        plannedVolume! > 0 &&
-        plannedVolumeUnit.isNotEmpty) {
-      return '${_formatVolumeValue(plannedVolume!)} $plannedVolumeUnit';
-    }
-    return 'Not tracked';
-  }
-
-  String get volumeBody {
-    if (hasComparableVolume) {
-      return 'Actual vs planned tracked volume for the same unit.';
-    }
-    if (actualVolume != null &&
-        actualVolume! > 0 &&
-        actualVolumeUnit.isNotEmpty) {
-      return 'Tracked volume recorded for the completed session.';
-    }
-    if (plannedVolume != null &&
-        plannedVolume! > 0 &&
-        plannedVolumeUnit.isNotEmpty) {
-      return 'Planned tracked volume for this session.';
-    }
-    return 'This session did not expose a clean tracked volume comparison.';
   }
 }
 
