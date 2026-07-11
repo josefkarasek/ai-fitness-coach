@@ -675,24 +675,25 @@ class _HomeScreenState extends State<HomeScreen>
                                 ),
                   ),
                 ],
-                if (DateTime.now().weekday == DateTime.monday &&
-                    plan != null) ...<Widget>[
+                if (plan != null &&
+                    _weeklyCoachingPreview != null &&
+                    displayedWeekNumber == currentWeekNumber) ...<Widget>[
                   const SizedBox(height: 18),
-                  _WeeklyMondayBriefingCard(
+                  _WeeklyTransitionCard(
                     currentWeekNumber: displayedWeekNumber,
                     totalWeeks: plan.durationWeeks,
                     phaseLabel: currentWeek?.theme.isNotEmpty == true
                         ? currentWeek!.theme
                         : 'Current phase',
                     weeklyPreview: _weeklyCoachingPreview,
-                    nextMilestoneTitle: _nextMilestoneTitle(
+                    lastWeekRecap: _lastWeekRecap(
                       plan,
-                      displayedWeekNumber,
+                      workoutLogsForPlan,
+                      currentWeekNumber,
                     ),
-                    nextMilestoneBody: _nextMilestoneBody(
+                    whatChanged: _whatChangedThisWeek(
                       plan,
-                      displayedWeekNumber,
-                      _weeklyCoachingPreview,
+                      currentWeekNumber,
                     ),
                     onReadCoachingBook: () => _showCoachingBookSheet(
                       context,
@@ -845,6 +846,12 @@ class _HomeScreenState extends State<HomeScreen>
                                 ? null
                                 : _importPastExercisesFromEmptyState,
                             child: const Text('Import History'),
+                          ),
+                          OutlinedButton(
+                            onPressed: _busy || plan == null
+                                ? null
+                                : _generateWeeklyBriefingForTesting,
+                            child: const Text('Generate Briefing'),
                           ),
                           TextButton(
                             onPressed: _busy ? null : _signOut,
@@ -1549,6 +1556,84 @@ class _HomeScreenState extends State<HomeScreen>
     return parts.join(' ');
   }
 
+  String _lastWeekRecap(
+    _TrainingPlanResult? plan,
+    List<_WorkoutLogItem> workoutLogs,
+    int currentWeekNumber,
+  ) {
+    if (plan == null || currentWeekNumber <= 1) {
+      return 'This block is just getting started, so the first signal is simply to settle into the work and establish repeatable training quality.';
+    }
+
+    final int previousWeekNumber = currentWeekNumber - 1;
+    final _TrainingPlanWeek? previousWeek =
+        _currentWeek(plan, previousWeekNumber);
+    final List<_WorkoutLogItem> previousWeekLogs = workoutLogs
+        .where((_WorkoutLogItem item) => item.weekNumber == previousWeekNumber)
+        .toList(growable: false);
+    final int plannedSessions = previousWeek?.workouts.length ?? 0;
+    final int completedSessions = previousWeekLogs.length;
+    final int totalReps = previousWeekLogs.fold<int>(
+        0, (int total, _WorkoutLogItem item) => total + item.totalReps.round());
+
+    final List<String> parts = <String>[
+      'Last week you completed $completedSessions of $plannedSessions scheduled sessions'
+          '${previousWeek?.theme.trim().isNotEmpty == true ? ' during ${previousWeek!.theme.trim()}' : ''}.',
+      if (totalReps > 0)
+        'That gave the coach roughly $totalReps logged reps of fresh signal to work from.',
+    ];
+    return parts.join(' ');
+  }
+
+  String _whatChangedThisWeek(
+    _TrainingPlanResult? plan,
+    int currentWeekNumber,
+  ) {
+    if (plan == null || currentWeekNumber <= 1) {
+      return 'This first week establishes the baseline: movement quality, honest logging, and enough structure for the coach to learn from.';
+    }
+
+    final _TrainingPlanWeek? previousWeek =
+        _currentWeek(plan, currentWeekNumber - 1);
+    final _TrainingPlanWeek? currentWeek =
+        _currentWeek(plan, currentWeekNumber);
+    if (currentWeek == null) {
+      return 'This week continues the block with a fresh emphasis.';
+    }
+
+    final List<String> parts = <String>[];
+    if (previousWeek != null &&
+        previousWeek.theme.trim().isNotEmpty &&
+        currentWeek.theme.trim().isNotEmpty &&
+        previousWeek.theme.trim() != currentWeek.theme.trim()) {
+      parts.add(
+        'The phase shifts from ${previousWeek.theme.trim()} into ${currentWeek.theme.trim()}.',
+      );
+    } else if (currentWeek.theme.trim().isNotEmpty) {
+      parts.add('The emphasis this week is ${currentWeek.theme.trim()}.');
+    }
+
+    final Set<String> previousTitles = <String>{
+      for (final _TrainingPlanWorkout workout
+          in previousWeek?.workouts ?? const <_TrainingPlanWorkout>[])
+        workout.title.trim(),
+    };
+    final List<String> newTitles = currentWeek.workouts
+        .map((_TrainingPlanWorkout workout) => workout.title.trim())
+        .where((String title) =>
+            title.isNotEmpty && !previousTitles.contains(title))
+        .take(2)
+        .toList(growable: false);
+    if (newTitles.isNotEmpty) {
+      parts.add('New stress arrives through ${newTitles.join(' and ')}.');
+    }
+
+    if (parts.isEmpty) {
+      return 'The structure stays broadly familiar, but the coach is adjusting the stress and emphasis to keep the block moving forward.';
+    }
+    return parts.join(' ');
+  }
+
   String _firstSentence(String text) {
     final String trimmed = text.trim();
     if (trimmed.isEmpty) {
@@ -1637,6 +1722,15 @@ class _HomeScreenState extends State<HomeScreen>
             savedLog: savedLog,
             plannedWorkout: plannedWorkout,
             reviewDetails: reviewDetails,
+            onOpenCoachingBook: () => _showCoachingBookSheet(
+              context,
+              plan,
+              _athleteName(_auth.currentUser, _backendUser),
+              _currentWeek(plan, savedLog.weekNumber),
+              savedLog.weekNumber,
+              _weeklyCoachingPreview,
+              initialSelectedWeekNumber: savedLog.weekNumber,
+            ),
           );
         },
       ),
@@ -1644,13 +1738,13 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _showCoachingBookSheet(
-    BuildContext context,
-    _TrainingPlanResult plan,
-    String athleteName,
-    _TrainingPlanWeek? currentWeek,
-    int currentWeekNumber,
-    _WeeklyCoachingPreview? weeklyPreview,
-  ) async {
+      BuildContext context,
+      _TrainingPlanResult plan,
+      String athleteName,
+      _TrainingPlanWeek? currentWeek,
+      int currentWeekNumber,
+      _WeeklyCoachingPreview? weeklyPreview,
+      {int? initialSelectedWeekNumber}) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) {
@@ -1667,6 +1761,7 @@ class _HomeScreenState extends State<HomeScreen>
               currentWeekNumber,
               weeklyPreview,
             ),
+            initialSelectedWeekNumber: initialSelectedWeekNumber,
           );
         },
       ),
@@ -2718,15 +2813,14 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _maybeLoadWeeklyCoachingPreview(
-    String token,
-    _TrainingPlanResult plan,
-  ) async {
+      String token, _TrainingPlanResult plan,
+      {bool force = false}) async {
     final User? currentUser = _auth.currentUser;
     if (currentUser == null) {
       return;
     }
 
-    if (DateTime.now().weekday != DateTime.monday) {
+    if (!force && DateTime.now().weekday != DateTime.monday) {
       if (_weeklyCoachingPreview != null && mounted) {
         setState(() {
           _weeklyCoachingPreview = null;
@@ -2762,7 +2856,8 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     final String currentAnchor = _weekAnchorKey(DateTime.now());
-    if (_weeklyCoachingPreview != null &&
+    if (!force &&
+        _weeklyCoachingPreview != null &&
         _weeklyCoachingPreview!.trainingPlanID == plan.planID &&
         _weeklyCoachingPreview!.currentWeek == currentWeekNumber &&
         widget.preferences.getWeeklyPreviewAnchor(
@@ -2779,7 +2874,7 @@ class _HomeScreenState extends State<HomeScreen>
       plan: plan,
       workoutLogs: workoutLogsForPlan,
     );
-    if (cachedPreview != null) {
+    if (!force && cachedPreview != null) {
       if (mounted) {
         setState(() {
           _weeklyCoachingPreview = cachedPreview;
@@ -2826,6 +2921,23 @@ class _HomeScreenState extends State<HomeScreen>
 
     setState(() {
       _weeklyCoachingPreview = preview;
+    });
+  }
+
+  Future<void> _generateWeeklyBriefingForTesting() async {
+    final _TrainingPlanResult? plan = _latestTrainingPlan;
+    if (plan == null) {
+      throw const _UiException('Load or generate a block first.');
+    }
+
+    await _runBusyAction(() async {
+      final String token = await _requireIdToken();
+      await _maybeLoadWeeklyCoachingPreview(token, plan, force: true);
+      if (_weeklyCoachingPreview == null) {
+        _setStatus('Weekly briefing was not returned.');
+        return;
+      }
+      _setStatus('Weekly briefing generated for testing.');
     });
   }
 
@@ -4760,14 +4872,14 @@ class _MiniProgressRingPainter extends CustomPainter {
   }
 }
 
-class _WeeklyMondayBriefingCard extends StatelessWidget {
-  const _WeeklyMondayBriefingCard({
+class _WeeklyTransitionCard extends StatelessWidget {
+  const _WeeklyTransitionCard({
     required this.currentWeekNumber,
     required this.totalWeeks,
     required this.phaseLabel,
     required this.weeklyPreview,
-    required this.nextMilestoneTitle,
-    required this.nextMilestoneBody,
+    required this.lastWeekRecap,
+    required this.whatChanged,
     required this.onReadCoachingBook,
   });
 
@@ -4775,8 +4887,8 @@ class _WeeklyMondayBriefingCard extends StatelessWidget {
   final int totalWeeks;
   final String phaseLabel;
   final _WeeklyCoachingPreview? weeklyPreview;
-  final String nextMilestoneTitle;
-  final String nextMilestoneBody;
+  final String lastWeekRecap;
+  final String whatChanged;
   final VoidCallback? onReadCoachingBook;
 
   @override
@@ -4798,7 +4910,7 @@ class _WeeklyMondayBriefingCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const Text(
-            'This Week\'s Briefing',
+            'Week Transition',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
@@ -4828,7 +4940,25 @@ class _WeeklyMondayBriefingCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const _SectionTitle('Coach Check-In'),
+                const _SectionTitle('Last Week Recap'),
+                const SizedBox(height: 12),
+                Text(
+                  lastWeekRecap,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    height: 1.6,
+                    color: _textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('This Week\'s Briefing'),
                 const SizedBox(height: 12),
                 Text(
                   hasGeneratedBriefing
@@ -4848,22 +4978,13 @@ class _WeeklyMondayBriefingCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const _SectionTitle('Next Milestone'),
+                const _SectionTitle('What Changed'),
                 const SizedBox(height: 12),
                 Text(
-                  nextMilestoneTitle,
+                  whatChanged,
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: _textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  nextMilestoneBody,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    height: 1.55,
+                    fontSize: 16,
+                    height: 1.6,
                     color: _textSecondary,
                   ),
                 ),
@@ -4937,6 +5058,7 @@ class _CoachingBookScreen extends StatefulWidget {
     required this.programLabel,
     required this.nextMilestoneTitle,
     required this.nextMilestoneBody,
+    this.initialSelectedWeekNumber,
   });
 
   final String athleteName;
@@ -4947,6 +5069,7 @@ class _CoachingBookScreen extends StatefulWidget {
   final String programLabel;
   final String nextMilestoneTitle;
   final String nextMilestoneBody;
+  final int? initialSelectedWeekNumber;
 
   @override
   State<_CoachingBookScreen> createState() => _CoachingBookScreenState();
@@ -4958,7 +5081,8 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedWeekNumber = widget.currentWeekNumber;
+    _selectedWeekNumber =
+        widget.initialSelectedWeekNumber ?? widget.currentWeekNumber;
   }
 
   @override
@@ -4971,6 +5095,13 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
         _coachingBookWeek(widget.plan, nextWeekNumber);
     final _TrainingPlanWeek? selectedWeek =
         _coachingBookWeek(widget.plan, _selectedWeekNumber);
+    final String weeklyFeedback = widget.weeklyPreview?.feedback.trim() ?? '';
+    final String weeklyMotivation =
+        widget.weeklyPreview?.motivation.trim() ?? '';
+    final bool hasWeeklyBriefing =
+        weeklyFeedback.isNotEmpty || weeklyMotivation.isNotEmpty;
+    final bool selectedWeekIsCurrent =
+        selectedWeek?.weekNumber == widget.currentWeekNumber;
 
     return Scaffold(
       backgroundColor: _bgTop,
@@ -5007,6 +5138,58 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
                 ),
               ),
               const SizedBox(height: 20),
+              if (hasWeeklyBriefing) ...<Widget>[
+                _Card(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        widget.weeklyPreview?.currentWeek ==
+                                widget.currentWeekNumber
+                            ? 'This Week\'s Briefing'
+                            : 'Coach Briefing',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _textMuted,
+                        ),
+                      ),
+                      if (weeklyFeedback.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 12),
+                        Text(
+                          weeklyFeedback,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            height: 1.6,
+                            color: _textSecondary,
+                          ),
+                        ),
+                      ],
+                      if (weeklyMotivation.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 14),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: _surfaceRaised,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: _outlineSoft),
+                          ),
+                          child: Text(
+                            weeklyMotivation,
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.55,
+                              color: _accentGreen.withValues(alpha: 0.94),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               _Card(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -5026,6 +5209,46 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
                       const SizedBox(height: 12),
                       Text(
                         widget.plan.summary.trim(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const _SectionTitle('Why This Block Exists'),
+                    const SizedBox(height: 12),
+                    Text(
+                      _coachingBookBlockExplanation(widget.plan),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.6,
+                        color: _textSecondary,
+                      ),
+                    ),
+                    if (widget.plan.progressionStrategy
+                        .trim()
+                        .isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Progression',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.plan.progressionStrategy.trim(),
                         style: const TextStyle(
                           fontSize: 15,
                           height: 1.6,
@@ -5132,6 +5355,28 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Why This Week Matters',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _coachingBookWeekExplanation(
+                          selectedWeek,
+                          selectedWeekIsCurrent: selectedWeekIsCurrent,
+                          weeklyPreview: widget.weeklyPreview,
+                        ),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: _textSecondary,
+                        ),
+                      ),
                       if (selectedWeek.workouts.isNotEmpty) ...<Widget>[
                         const SizedBox(height: 16),
                         const _SectionTitle('Planned Workouts'),
@@ -5196,6 +5441,30 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
                         color: _textSecondary,
                       ),
                     ),
+                    if (widget.weeklyPreview != null &&
+                        widget.weeklyPreview!.previewWeek == nextWeekNumber &&
+                        widget.weeklyPreview!.previewTheme
+                            .trim()
+                            .isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Preview theme',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.weeklyPreview!.previewTheme.trim(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: _accentBlue,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -5204,7 +5473,7 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    const _SectionTitle('How This Block Works'),
+                    const _SectionTitle('Coach\'s Lens'),
                     if (widget.plan.philosophy.trim().isNotEmpty) ...<Widget>[
                       const SizedBox(height: 12),
                       Text(
@@ -5238,6 +5507,28 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
                         ),
                       ),
                     ],
+                    if (widget.plan.successCriteria
+                        .trim()
+                        .isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'What success looks like',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.plan.successCriteria.trim(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -5251,26 +5542,6 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
                       const SizedBox(height: 12),
                       Text(
                         widget.plan.risks.trim(),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: _textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              if (widget.plan.successCriteria.trim().isNotEmpty) ...<Widget>[
-                const SizedBox(height: 16),
-                _Card(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      const _SectionTitle('Success Criteria'),
-                      const SizedBox(height: 12),
-                      Text(
-                        widget.plan.successCriteria.trim(),
                         style: const TextStyle(
                           fontSize: 15,
                           height: 1.6,
@@ -5308,6 +5579,64 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
 
     final int nextWeek = currentWeekNumber + 1;
     return nextWeek.clamp(1, plan.durationWeeks);
+  }
+
+  String _coachingBookBlockExplanation(_TrainingPlanResult plan) {
+    final List<String> parts = <String>[];
+    if (plan.summary.trim().isNotEmpty) {
+      parts.add(plan.summary.trim());
+    }
+    if (plan.philosophy.trim().isNotEmpty) {
+      parts.add(_coachingBookFirstSentence(plan.philosophy));
+    }
+    if (parts.isEmpty) {
+      return 'This block is written to build steady progress, keep the signal clear, and prepare stronger work later in the cycle.';
+    }
+    return parts.join(' ');
+  }
+
+  String _coachingBookWeekExplanation(
+    _TrainingPlanWeek week, {
+    required bool selectedWeekIsCurrent,
+    required _WeeklyCoachingPreview? weeklyPreview,
+  }) {
+    final List<String> parts = <String>[];
+    if (week.theme.trim().isNotEmpty) {
+      parts.add(week.theme.trim());
+    }
+    if (selectedWeekIsCurrent &&
+        weeklyPreview != null &&
+        weeklyPreview.currentWeek == week.weekNumber &&
+        weeklyPreview.feedback.trim().isNotEmpty) {
+      parts.add(weeklyPreview.feedback.trim());
+    } else if (weeklyPreview != null &&
+        weeklyPreview.previewWeek == week.weekNumber &&
+        weeklyPreview.previewTheme.trim().isNotEmpty) {
+      parts.add(weeklyPreview.previewTheme.trim());
+    } else if (week.workouts.isNotEmpty) {
+      final List<String> workoutNames = week.workouts
+          .take(3)
+          .map((_TrainingPlanWorkout workout) => workout.title)
+          .toList(growable: false);
+      parts.add(
+        'This week is organized around ${workoutNames.join(', ')} to move the block forward without losing quality.',
+      );
+    }
+    if (parts.isEmpty) {
+      return 'This week continues the broader block objective with steady, repeatable work.';
+    }
+    return parts.join(' ');
+  }
+
+  String _coachingBookFirstSentence(String text) {
+    final String trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+
+    final RegExp sentenceBoundary = RegExp(r'(?<=[.!?])\s+');
+    final List<String> parts = trimmed.split(sentenceBoundary);
+    return parts.first.trim();
   }
 }
 
@@ -6654,12 +6983,14 @@ class _WorkoutReviewScreen extends StatelessWidget {
     required this.savedLog,
     required this.plannedWorkout,
     required this.reviewDetails,
+    required this.onOpenCoachingBook,
   });
 
   final _TrainingPlanResult plan;
   final _WorkoutLogItem savedLog;
   final _TrainingPlanWorkout? plannedWorkout;
   final _WorkoutReviewDetails reviewDetails;
+  final VoidCallback onOpenCoachingBook;
 
   @override
   Widget build(BuildContext context) {
@@ -6849,6 +7180,15 @@ class _WorkoutReviewScreen extends StatelessWidget {
                         ),
                       ],
                     ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: onOpenCoachingBook,
+                    icon: const Icon(Icons.menu_book_rounded),
+                    label: const Text('Open Coaching Book'),
                   ),
                 ),
                 if (plannedWorkout != null &&
@@ -7735,13 +8075,33 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            exercise.title,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: _textPrimary,
-            ),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _showExerciseExplanation(exerciseIndex),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Text(
+                      exercise.title,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: _textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => _showExerciseExplanation(exerciseIndex),
+                icon: const Icon(Icons.help_outline_rounded),
+                color: _textMuted,
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Why is this here?',
+              ),
+            ],
           ),
           if (exercise.notes.isNotEmpty) ...<Widget>[
             const SizedBox(height: 4),
@@ -8079,6 +8439,128 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
       return 'Treat this as quality upper-back work, not momentum work.';
     }
     return 'Move well, log honestly, and keep this exercise connected to the purpose of the day.';
+  }
+
+  Future<void> _showExerciseExplanation(int exerciseIndex) async {
+    final _PlannedExercise? plannedExercise =
+        exerciseIndex < widget.workout.plannedExercises.length
+            ? widget.workout.plannedExercises[exerciseIndex]
+            : null;
+    final String title =
+        plannedExercise?.title ?? _exercises[exerciseIndex].title;
+    final String execution = plannedExercise?.notes.trim().isNotEmpty == true
+        ? plannedExercise!.notes.trim()
+        : _exerciseGuidance(title);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return _ExerciseExplanationSheet(
+          title: title,
+          reason: _exerciseReason(title),
+          support: _exerciseSupportPath(),
+          execution: execution,
+          movementPattern: _movementPatternLabel(title),
+        );
+      },
+    );
+  }
+
+  String _exerciseReason(String title) {
+    final String lower = title.toLowerCase();
+    final List<String> parts = <String>[
+      if (widget.workout.focus.trim().isNotEmpty)
+        _exerciseExplanationFirstSentence(widget.workout.focus),
+    ];
+    if (lower.contains('squat')) {
+      parts.add(
+          'It reinforces lower-body strength, bracing, and position under load.');
+    } else if (lower.contains('deadlift') ||
+        lower.contains('rdl') ||
+        lower.contains('hinge')) {
+      parts.add(
+          'It builds posterior-chain strength and helps you own the hinge pattern under fatigue.');
+    } else if (lower.contains('bench') || lower.contains('press')) {
+      parts.add(
+          'It develops pressing force while keeping the upper body contributing to the larger block objective.');
+    } else if (lower.contains('row') || lower.contains('pull')) {
+      parts.add(
+          'It supports upper-back balance, posture, and better positions on the bigger lifts.');
+    } else if (lower.contains('carry')) {
+      parts.add(
+          'It ties trunk stability, grip, and positional control together in a way that carries into the main lifts.');
+    } else if (lower.contains('split squat') || lower.contains('lunge')) {
+      parts.add(
+          'It gives you single-leg strength and control that keeps the main bilateral work cleaner.');
+    } else {
+      parts.add(
+          'It exists to support the day objective with repeatable, coachable work.');
+    }
+    return parts.join(' ');
+  }
+
+  String _exerciseSupportPath() {
+    final int nextWeekNumber = math.min(
+      widget.plan.durationWeeks,
+      widget.workout.weekNumber + 1,
+    );
+    _TrainingPlanWeek? nextWeek;
+    for (final _TrainingPlanWeek week in widget.plan.weeks) {
+      if (week.weekNumber == nextWeekNumber) {
+        nextWeek = week;
+        break;
+      }
+    }
+    if (nextWeek != null && nextWeek.theme.trim().isNotEmpty) {
+      return 'This supports the next stage of the block: ${nextWeek.theme.trim()}.';
+    }
+    if (widget.plan.progressionStrategy.trim().isNotEmpty) {
+      return _exerciseExplanationFirstSentence(widget.plan.progressionStrategy);
+    }
+    return 'This sets up stronger work later in the block by keeping the signal clean now.';
+  }
+
+  String _movementPatternLabel(String title) {
+    final String lower = title.toLowerCase();
+    if (lower.contains('squat')) {
+      return 'Squat';
+    }
+    if (lower.contains('deadlift') ||
+        lower.contains('rdl') ||
+        lower.contains('hinge')) {
+      return 'Hinge';
+    }
+    if (lower.contains('bench') || lower.contains('press')) {
+      return 'Press';
+    }
+    if (lower.contains('row') || lower.contains('pull')) {
+      return 'Pull';
+    }
+    if (lower.contains('carry')) {
+      return 'Carry';
+    }
+    if (lower.contains('split squat') || lower.contains('lunge')) {
+      return 'Single-leg';
+    }
+    if (lower.contains('plank') ||
+        lower.contains('carry') ||
+        lower.contains('rotation')) {
+      return 'Trunk';
+    }
+    return 'Assistance';
+  }
+
+  String _exerciseExplanationFirstSentence(String text) {
+    final String trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+
+    final RegExp sentenceBoundary = RegExp(r'(?<=[.!?])\s+');
+    final List<String> parts = trimmed.split(sentenceBoundary);
+    return parts.first.trim();
   }
 
   bool _showsNumericValueField(String unit) {
@@ -9516,6 +9998,118 @@ class _WorkoutSetCountButton extends StatelessWidget {
           icon,
           size: 16,
           color: enabled ? _textPrimary : _textMuted,
+        ),
+      ),
+    );
+  }
+}
+
+class _ExerciseExplanationSheet extends StatelessWidget {
+  const _ExerciseExplanationSheet({
+    required this.title,
+    required this.reason,
+    required this.support,
+    required this.execution,
+    required this.movementPattern,
+  });
+
+  final String title;
+  final String reason;
+  final String support;
+  final String execution;
+  final String movementPattern;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _outline),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: _outlineSoft,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: _textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Why is this here?',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _textMuted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              reason,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.55,
+                color: _textSecondary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'What does it support later?',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _textMuted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              support,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.55,
+                color: _textSecondary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Coach note',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _textMuted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              execution,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.55,
+                color: _textSecondary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _DetailPill(label: 'Movement Pattern · $movementPattern'),
+          ],
         ),
       ),
     );
