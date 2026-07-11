@@ -275,7 +275,12 @@ func (s *WorkoutLogStore) attachWorkoutLogExercises(ctx context.Context, logs []
 	}
 	defer rows.Close()
 
-	exerciseIndex := make(map[int64]*handlers.WorkoutLogExerciseRecord)
+	type exerciseLocation struct {
+		record        *handlers.WorkoutLogRecord
+		exerciseIndex int
+	}
+
+	exerciseIndex := make(map[int64]exerciseLocation)
 	for rows.Next() {
 		var (
 			exerciseID int64
@@ -288,7 +293,10 @@ func (s *WorkoutLogStore) attachWorkoutLogExercises(ctx context.Context, logs []
 
 		record := logIndex[logID]
 		record.Exercises = append(record.Exercises, exercise)
-		exerciseIndex[exerciseID] = &record.Exercises[len(record.Exercises)-1]
+		exerciseIndex[exerciseID] = exerciseLocation{
+			record:        record,
+			exerciseIndex: len(record.Exercises) - 1,
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterate workout log exercises: %w", err)
@@ -329,7 +337,14 @@ func (s *WorkoutLogStore) attachWorkoutLogExercises(ctx context.Context, logs []
 		if err := setRows.Scan(&exerciseID, &set.SequenceNumber, &set.Reps, &set.Value, &set.Unit, &set.LoadValue, &set.LoadUnit, &set.Completed); err != nil {
 			return fmt.Errorf("scan workout log set: %w", err)
 		}
-		exerciseIndex[exerciseID].Sets = append(exerciseIndex[exerciseID].Sets, set)
+		location, ok := exerciseIndex[exerciseID]
+		if !ok {
+			continue
+		}
+		location.record.Exercises[location.exerciseIndex].Sets = append(
+			location.record.Exercises[location.exerciseIndex].Sets,
+			set,
+		)
 	}
 	if err := setRows.Err(); err != nil {
 		return fmt.Errorf("iterate workout log sets: %w", err)

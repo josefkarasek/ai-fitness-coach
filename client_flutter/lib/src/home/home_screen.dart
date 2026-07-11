@@ -803,6 +803,31 @@ class _HomeScreenState extends State<HomeScreen>
                           color: _textMuted,
                         ),
                       ),
+                      if (_backendUser != null) ...<Widget>[
+                        const SizedBox(height: 8),
+                        Text(
+                          _backendUser!.redeemedPromoCode.isEmpty
+                              ? 'Promo code: none'
+                              : 'Promo code: ${_backendUser!.redeemedPromoCode}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: _textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _backendUser!.aiAccessEnabled
+                              ? 'Paid AI access: enabled'
+                              : 'Paid AI access: disabled',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: _backendUser!.aiAccessEnabled
+                                ? _accentGreen
+                                : _textMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 14),
                       Wrap(
                         spacing: 12,
@@ -1903,6 +1928,11 @@ class _HomeScreenState extends State<HomeScreen>
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      final String promoCode = _promoCodeController.text.trim();
+      if (promoCode.isNotEmpty) {
+        final String token = await _requireIdToken();
+        await _redeemPromoCode(token, promoCode);
+      }
       _setStatus('Signed in successfully.');
     });
   }
@@ -5013,7 +5043,7 @@ class _WeeklyMondayBriefingCard extends StatelessWidget {
   }
 }
 
-class _CoachingBookScreen extends StatelessWidget {
+class _CoachingBookScreen extends StatefulWidget {
   const _CoachingBookScreen({
     required this.athleteName,
     required this.plan,
@@ -5035,12 +5065,28 @@ class _CoachingBookScreen extends StatelessWidget {
   final String nextMilestoneBody;
 
   @override
+  State<_CoachingBookScreen> createState() => _CoachingBookScreenState();
+}
+
+class _CoachingBookScreenState extends State<_CoachingBookScreen> {
+  late int _selectedWeekNumber;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedWeekNumber = widget.currentWeekNumber;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final int nextWeekNumber = _coachingBookNextMilestoneWeekNumber(
-      plan,
-      currentWeekNumber,
+      widget.plan,
+      widget.currentWeekNumber,
     );
-    final _TrainingPlanWeek? nextWeek = _coachingBookWeek(plan, nextWeekNumber);
+    final _TrainingPlanWeek? nextWeek =
+        _coachingBookWeek(widget.plan, nextWeekNumber);
+    final _TrainingPlanWeek? selectedWeek =
+        _coachingBookWeek(widget.plan, _selectedWeekNumber);
 
     return Scaffold(
       backgroundColor: _bgTop,
@@ -5061,7 +5107,7 @@ class _CoachingBookScreen extends StatelessWidget {
               const _CoachPill(label: 'Coaching Book'),
               const SizedBox(height: 16),
               Text(
-                'Written for $athleteName',
+                'Written for ${widget.athleteName}',
                 style: const TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.w800,
@@ -5070,7 +5116,7 @@ class _CoachingBookScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                '${plan.durationWeeks} weeks • $programLabel',
+                '${widget.plan.durationWeeks} weeks • ${widget.programLabel}',
                 style: const TextStyle(
                   fontSize: 15,
                   color: _textSecondary,
@@ -5084,7 +5130,7 @@ class _CoachingBookScreen extends StatelessWidget {
                     const _SectionTitle('Program Objective'),
                     const SizedBox(height: 12),
                     Text(
-                      plan.objective,
+                      widget.plan.objective,
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
@@ -5092,10 +5138,10 @@ class _CoachingBookScreen extends StatelessWidget {
                         color: _textPrimary,
                       ),
                     ),
-                    if (plan.summary.trim().isNotEmpty) ...<Widget>[
+                    if (widget.plan.summary.trim().isNotEmpty) ...<Widget>[
                       const SizedBox(height: 12),
                       Text(
-                        plan.summary.trim(),
+                        widget.plan.summary.trim(),
                         style: const TextStyle(
                           fontSize: 15,
                           height: 1.6,
@@ -5107,128 +5153,141 @@ class _CoachingBookScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              _Card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    const _SectionTitle('Current Week'),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Week $currentWeekNumber${currentWeek != null && currentWeek!.theme.trim().isNotEmpty ? ' • ${currentWeek!.theme.trim()}' : ''}',
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: _accentGreen,
-                      ),
-                    ),
-                    if (weeklyPreview != null &&
-                        weeklyPreview!.feedback.trim().isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 12),
-                      Text(
-                        weeklyPreview!.feedback.trim(),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: _textSecondary,
-                        ),
-                      ),
-                    ] else if (currentWeek != null &&
-                        currentWeek!.theme.trim().isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 12),
-                      Text(
-                        currentWeek!.theme.trim(),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: _textSecondary,
-                        ),
-                      ),
-                    ],
-                    if (weeklyPreview != null &&
-                        weeklyPreview!.motivation
-                            .trim()
-                            .isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 12),
-                      Text(
-                        weeklyPreview!.motivation.trim(),
-                        style: TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: _accentGreen.withValues(alpha: 0.95),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              _Card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    const _SectionTitle('Week Timeline'),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: plan.weeks
-                          .map(
-                            (_TrainingPlanWeek week) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: week.weekNumber == currentWeekNumber
-                                    ? _accentGreen.withValues(alpha: 0.18)
-                                    : _surfaceRaised,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: week.weekNumber == currentWeekNumber
-                                      ? _accentGreen
-                                      : _outlineSoft,
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[
-                                  Text(
-                                    'Week ${week.weekNumber}',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
+              if (selectedWeek != null) ...<Widget>[
+                _Card(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      const _SectionTitle('Week Timeline'),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: widget.plan.weeks
+                            .map(
+                              (_TrainingPlanWeek week) => InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedWeekNumber = week.weekNumber;
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(999),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        week.weekNumber == _selectedWeekNumber
+                                            ? _accentGreen.withValues(
+                                                alpha: 0.18,
+                                              )
+                                            : _surfaceRaised,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
                                       color:
-                                          week.weekNumber == currentWeekNumber
+                                          week.weekNumber == _selectedWeekNumber
+                                              ? _accentGreen
+                                              : _outlineSoft,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: <Widget>[
+                                      Text(
+                                        '${week.weekNumber}',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: week.weekNumber ==
+                                                  _selectedWeekNumber
                                               ? _accentGreen
                                               : _textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  SizedBox(
-                                    width: 140,
-                                    child: Text(
-                                      week.theme.trim().isEmpty
-                                          ? 'Program week'
-                                          : week.theme.trim(),
-                                      maxLines: 3,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        height: 1.4,
-                                        color: _textSecondary,
+                                        ),
                                       ),
-                                    ),
+                                      if (week.weekNumber ==
+                                          widget.currentWeekNumber) ...<Widget>[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFFFFD166),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      ],
+                                      if (week.weekNumber ==
+                                          _selectedWeekNumber) ...<Widget>[
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          'selected',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: _textMuted,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                  ],
+                            )
+                            .toList(growable: false),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Week ${selectedWeek.weekNumber}${selectedWeek.weekNumber == widget.currentWeekNumber ? ' · current' : ''}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: selectedWeek.weekNumber ==
+                                  widget.currentWeekNumber
+                              ? _accentGreen
+                              : _textPrimary,
+                        ),
+                      ),
+                      if (selectedWeek.theme.trim().isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 8),
+                        Text(
+                          selectedWeek.theme.trim(),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            height: 1.5,
+                            color: _textSecondary,
+                          ),
+                        ),
+                      ],
+                      if (selectedWeek.workouts.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 16),
+                        const _SectionTitle('Planned Workouts'),
+                        const SizedBox(height: 12),
+                        for (int index = 0;
+                            index < selectedWeek.workouts.length;
+                            index++) ...<Widget>[
+                          _CoachingBookWorkoutRow(
+                            workout: selectedWeek.workouts[index],
+                          ),
+                          if (index != selectedWeek.workouts.length - 1)
+                            const SizedBox(height: 12),
+                        ],
+                      ] else ...<Widget>[
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No workouts are scheduled for this week yet.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: _textMuted,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(height: 16),
               _Card(
                 child: Column(
@@ -5237,7 +5296,7 @@ class _CoachingBookScreen extends StatelessWidget {
                     const _SectionTitle('Next Milestone'),
                     const SizedBox(height: 12),
                     Text(
-                      nextMilestoneTitle,
+                      widget.nextMilestoneTitle,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -5258,7 +5317,7 @@ class _CoachingBookScreen extends StatelessWidget {
                     ],
                     const SizedBox(height: 12),
                     Text(
-                      nextMilestoneBody,
+                      widget.nextMilestoneBody,
                       style: const TextStyle(
                         fontSize: 15,
                         height: 1.6,
@@ -5274,10 +5333,10 @@ class _CoachingBookScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     const _SectionTitle('How This Block Works'),
-                    if (plan.philosophy.trim().isNotEmpty) ...<Widget>[
+                    if (widget.plan.philosophy.trim().isNotEmpty) ...<Widget>[
                       const SizedBox(height: 12),
                       Text(
-                        plan.philosophy.trim(),
+                        widget.plan.philosophy.trim(),
                         style: const TextStyle(
                           fontSize: 15,
                           height: 1.6,
@@ -5285,7 +5344,9 @@ class _CoachingBookScreen extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (plan.progressionStrategy.trim().isNotEmpty) ...<Widget>[
+                    if (widget.plan.progressionStrategy
+                        .trim()
+                        .isNotEmpty) ...<Widget>[
                       const SizedBox(height: 16),
                       const Text(
                         'Progression strategy',
@@ -5297,7 +5358,7 @@ class _CoachingBookScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        plan.progressionStrategy.trim(),
+                        widget.plan.progressionStrategy.trim(),
                         style: const TextStyle(
                           fontSize: 15,
                           height: 1.6,
@@ -5308,7 +5369,7 @@ class _CoachingBookScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              if (plan.risks.trim().isNotEmpty) ...<Widget>[
+              if (widget.plan.risks.trim().isNotEmpty) ...<Widget>[
                 const SizedBox(height: 16),
                 _Card(
                   child: Column(
@@ -5317,7 +5378,7 @@ class _CoachingBookScreen extends StatelessWidget {
                       const _SectionTitle('Risks & Watchouts'),
                       const SizedBox(height: 12),
                       Text(
-                        plan.risks.trim(),
+                        widget.plan.risks.trim(),
                         style: const TextStyle(
                           fontSize: 15,
                           height: 1.6,
@@ -5328,7 +5389,7 @@ class _CoachingBookScreen extends StatelessWidget {
                   ),
                 ),
               ],
-              if (plan.successCriteria.trim().isNotEmpty) ...<Widget>[
+              if (widget.plan.successCriteria.trim().isNotEmpty) ...<Widget>[
                 const SizedBox(height: 16),
                 _Card(
                   child: Column(
@@ -5337,7 +5398,7 @@ class _CoachingBookScreen extends StatelessWidget {
                       const _SectionTitle('Success Criteria'),
                       const SizedBox(height: 12),
                       Text(
-                        plan.successCriteria.trim(),
+                        widget.plan.successCriteria.trim(),
                         style: const TextStyle(
                           fontSize: 15,
                           height: 1.6,
@@ -5375,6 +5436,73 @@ class _CoachingBookScreen extends StatelessWidget {
 
     final int nextWeek = currentWeekNumber + 1;
     return nextWeek.clamp(1, plan.durationWeeks);
+  }
+}
+
+class _CoachingBookWorkoutRow extends StatelessWidget {
+  const _CoachingBookWorkoutRow({
+    required this.workout,
+  });
+
+  final _TrainingPlanWorkout workout;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _surfaceRaised,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _outlineSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Day ${workout.dayNumber}',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: _textMuted,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            workout.title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: _textPrimary,
+            ),
+          ),
+          if (workout.focus.trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(
+              workout.focus.trim(),
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: _textSecondary,
+              ),
+            ),
+          ],
+          if (workout.exercises.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: workout.exercises
+                  .map(
+                    (_PlannedExercise exercise) =>
+                        _DetailPill(label: exercise.title),
+                  )
+                  .toList(growable: false),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
@@ -7019,7 +7147,7 @@ class _WorkoutSessionScreen extends StatefulWidget {
 }
 
 class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   static const List<String> _sessionFeelLabels = <String>[
     'Easy',
     'Good',
@@ -7037,11 +7165,26 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
   Duration _elapsed = Duration.zero;
   int _currentStep = 0;
   int _sessionFeelIndex = 1;
+  double _stepDragDistance = 0;
+  double _stepOffset = 0;
+  late final AnimationController _stepAnimationController;
+  Animation<double>? _stepOffsetAnimation;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _stepAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    )..addListener(() {
+        if (!mounted || _stepOffsetAnimation == null) {
+          return;
+        }
+        setState(() {
+          _stepOffset = _stepOffsetAnimation!.value;
+        });
+      });
     final _WorkoutSessionDraftSnapshot? initialDraftSnapshot =
         widget.initialDraftSnapshot;
     final String initialSessionNotes = initialDraftSnapshot?.sessionNotes ??
@@ -7084,6 +7227,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
     WidgetsBinding.instance.removeObserver(this);
     _elapsedTicker?.cancel();
     _draftPersistDebounce?.cancel();
+    _stepAnimationController.dispose();
     _durationController.dispose();
     _sessionNotesController.dispose();
     super.dispose();
@@ -7279,32 +7423,77 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
               ),
             ),
             Expanded(
-              child: KeyedSubtree(
-                key: ValueKey<int>(_currentStep),
-                child: _buildStepBody(),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragStart: (_) {
+                  _stepAnimationController.stop();
+                  _stepOffsetAnimation = null;
+                  _stepDragDistance = 0;
+                },
+                onHorizontalDragUpdate: (DragUpdateDetails details) {
+                  final double delta = details.primaryDelta ?? 0;
+                  _stepDragDistance += delta;
+                  setState(() {
+                    _stepOffset += delta;
+                  });
+                },
+                onHorizontalDragEnd: (DragEndDetails details) {
+                  final double velocity = details.primaryVelocity ?? 0;
+                  final double distance = _stepDragDistance;
+                  _stepDragDistance = 0;
+                  _handleStepDragEnd(
+                    viewportWidth: MediaQuery.sizeOf(context).width - 40,
+                    velocity: velocity,
+                    distance: distance,
+                  );
+                },
+                onHorizontalDragCancel: () {
+                  _stepDragDistance = 0;
+                  _animateStepBack();
+                },
+                child: LayoutBuilder(
+                  builder: (BuildContext context, BoxConstraints constraints) {
+                    final double viewportWidth = constraints.maxWidth;
+                    final int? adjacentStep = _adjacentStepIndex();
+                    return ClipRect(
+                      child: Stack(
+                        children: <Widget>[
+                          if (adjacentStep != null)
+                            Transform.translate(
+                              offset: Offset(
+                                _stepOffset > 0
+                                    ? _stepOffset - viewportWidth
+                                    : _stepOffset + viewportWidth,
+                                0,
+                              ),
+                              child: KeyedSubtree(
+                                key: ValueKey<int>(adjacentStep),
+                                child: _buildStepBodyFor(adjacentStep),
+                              ),
+                            ),
+                          Transform.translate(
+                            offset: Offset(_stepOffset, 0),
+                            child: KeyedSubtree(
+                              key: ValueKey<int>(_currentStep),
+                              child: _buildStepBodyFor(_currentStep),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-              child: Row(
-                children: <Widget>[
-                  if (_currentStep > 0)
-                    OutlinedButton(
-                      onPressed: _goBack,
-                      child: const Text('Back'),
-                    ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: _currentStep == _totalSteps - 1
-                        ? _finishSession
-                        : _goForward,
-                    child: Text(
-                      _currentStep == _totalSteps - 1
-                          ? 'Finish & Save'
-                          : 'Next',
-                    ),
-                  ),
-                ],
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, 24),
+              child: Text(
+                'Swipe left or right to move between coaching steps.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _textMuted,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
           ],
@@ -7313,14 +7502,24 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
     );
   }
 
-  Widget _buildStepBody() {
-    if (_currentStep == 0) {
+  int? _adjacentStepIndex() {
+    if (_stepOffset > 0 && _currentStep > 0) {
+      return _currentStep - 1;
+    }
+    if (_stepOffset < 0 && _currentStep < _totalSteps - 1) {
+      return _currentStep + 1;
+    }
+    return null;
+  }
+
+  Widget _buildStepBodyFor(int stepIndex) {
+    if (stepIndex == 0) {
       return _buildCoachInstructionsStep();
     }
-    if (_currentStep <= _exerciseGroups.length) {
-      return _buildExerciseStep(_exerciseGroups[_currentStep - 1]);
+    if (stepIndex <= _exerciseGroups.length) {
+      return _buildExerciseStep(_exerciseGroups[stepIndex - 1]);
     }
-    if (_currentStep == _exerciseGroups.length + 1) {
+    if (stepIndex == _exerciseGroups.length + 1) {
       return _buildWrapUpStep();
     }
     return _buildSummaryStep();
@@ -7585,6 +7784,14 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              onPressed: _finishSession,
+              child: const Text('Finish & Save'),
             ),
           ),
         ],
@@ -7875,24 +8082,74 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
     );
   }
 
-  void _goForward() {
-    if (_currentStep >= _totalSteps - 1) {
-      return;
-    }
-    setState(() {
-      _currentStep++;
-    });
-    _scheduleDraftPersist();
+  void _animateStepTo(double target, {VoidCallback? onCompleted}) {
+    _stepAnimationController.stop();
+    final double start = _stepOffset;
+    _stepOffsetAnimation = Tween<double>(
+      begin: start,
+      end: target,
+    ).animate(
+      CurvedAnimation(
+        parent: _stepAnimationController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+    _stepAnimationController
+      ..reset()
+      ..forward().whenCompleteOrCancel(() {
+        onCompleted?.call();
+      });
   }
 
-  void _goBack() {
-    if (_currentStep <= 0) {
+  void _animateStepBack() {
+    _animateStepTo(0, onCompleted: () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _stepOffset = 0;
+      });
+    });
+  }
+
+  void _handleStepDragEnd({
+    required double viewportWidth,
+    required double velocity,
+    required double distance,
+  }) {
+    final bool canMovePrevious = _currentStep > 0;
+    final bool canMoveNext = _currentStep < _totalSteps - 1;
+    final double threshold = math.max(56, viewportWidth * 0.22);
+
+    if ((velocity > 250 || distance > threshold) && canMovePrevious) {
+      _animateStepTo(viewportWidth, onCompleted: () {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _currentStep--;
+          _stepOffset = 0;
+        });
+        _scheduleDraftPersist();
+      });
       return;
     }
-    setState(() {
-      _currentStep--;
-    });
-    _scheduleDraftPersist();
+
+    if ((velocity < -250 || distance < -threshold) && canMoveNext) {
+      _animateStepTo(-viewportWidth, onCompleted: () {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _currentStep++;
+          _stepOffset = 0;
+        });
+        _scheduleDraftPersist();
+      });
+      return;
+    }
+
+    _animateStepBack();
   }
 
   void _finishSession() {

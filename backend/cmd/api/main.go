@@ -146,6 +146,13 @@ func buildWorkoutExplainer(cfg config.Config) (ai.WorkoutExplainer, error) {
 	switch cfg.AIProvider {
 	case "", "mock":
 		return ai.NewMockWorkoutExplainer(cfg.AIModel), nil
+	case "openai":
+		client, err := ai.NewOpenAIClient(cfg.AIBaseURL, cfg.AIAPIKey, cfg.AIModel)
+		if err != nil {
+			return nil, err
+		}
+
+		return ai.NewOpenAIWorkoutExplainer(client), nil
 	case "disabled":
 		return ai.NewDisabledWorkoutExplainer(), nil
 	default:
@@ -157,6 +164,13 @@ func buildTrainingPlanner(cfg config.Config) (ai.TrainingPlanner, error) {
 	switch cfg.AIProvider {
 	case "", "mock":
 		return ai.NewMockTrainingPlanner(cfg.AIModel), nil
+	case "openai":
+		client, err := ai.NewOpenAIClient(cfg.AIBaseURL, cfg.AIAPIKey, cfg.AIModel)
+		if err != nil {
+			return nil, err
+		}
+
+		return ai.NewOpenAITrainingPlanner(client), nil
 	case "disabled":
 		return ai.NewDisabledTrainingPlanner(), nil
 	default:
@@ -168,6 +182,13 @@ func buildWorkoutLogReviewer(cfg config.Config) (ai.WorkoutLogReviewer, error) {
 	switch cfg.AIProvider {
 	case "", "mock":
 		return ai.NewMockWorkoutLogReviewer(cfg.AIModel), nil
+	case "openai":
+		client, err := ai.NewOpenAIClient(cfg.AIBaseURL, cfg.AIAPIKey, cfg.AIModel)
+		if err != nil {
+			return nil, err
+		}
+
+		return ai.NewOpenAIWorkoutLogReviewer(client), nil
 	case "disabled":
 		return ai.NewDisabledWorkoutLogReviewer(), nil
 	default:
@@ -179,6 +200,13 @@ func buildWeeklyCoachingPreviewer(cfg config.Config) (ai.WeeklyCoachingPreviewer
 	switch cfg.AIProvider {
 	case "", "mock":
 		return ai.NewMockWeeklyCoachingPreviewer(cfg.AIModel), nil
+	case "openai":
+		client, err := ai.NewOpenAIClient(cfg.AIBaseURL, cfg.AIAPIKey, cfg.AIModel)
+		if err != nil {
+			return nil, err
+		}
+
+		return ai.NewOpenAIWeeklyCoachingPreviewer(client), nil
 	case "disabled":
 		return ai.NewDisabledWeeklyCoachingPreviewer(), nil
 	default:

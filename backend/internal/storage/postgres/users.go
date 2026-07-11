@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,8 +19,7 @@ func NewUserStore(db *pgxpool.Pool) *UserStore {
 }
 
 func (s *UserStore) UpsertByFirebaseIdentity(ctx context.Context, identity auth.Identity) (auth.User, error) {
-	var user auth.User
-	err := s.db.QueryRow(ctx, `
+	if _, err := s.db.Exec(ctx, `
 		insert into users (firebase_uid, email, display_name)
 		values ($1, nullif($2, ''), nullif($3, ''))
 		on conflict (firebase_uid)
@@ -27,7 +27,30 @@ func (s *UserStore) UpsertByFirebaseIdentity(ctx context.Context, identity auth.
 			email = excluded.email,
 			display_name = coalesce(excluded.display_name, users.display_name),
 			updated_at = now()
-		returning
+	`, identity.FirebaseUID, identity.Email, identity.DisplayName); err != nil {
+		return auth.User{}, fmt.Errorf("upsert user by firebase identity: %w", err)
+	}
+
+	user, err := s.loadUserByFirebaseUID(ctx, identity.FirebaseUID)
+	if err != nil {
+		return auth.User{}, fmt.Errorf("load upserted user by firebase identity: %w", err)
+	}
+
+	slog.Info("user upserted from firebase identity",
+		"user_id", user.ID,
+		"firebase_uid", user.FirebaseUID,
+		"email", user.Email,
+		"redeemed_promo_code", user.RedeemedPromoCode,
+		"ai_access_enabled", user.AIAccessEnabled,
+	)
+
+	return user, nil
+}
+
+func (s *UserStore) loadUserByFirebaseUID(ctx context.Context, firebaseUID string) (auth.User, error) {
+	var user auth.User
+	err := s.db.QueryRow(ctx, `
+		select
 			id::text,
 			firebase_uid,
 			coalesce(email, ''),
@@ -42,7 +65,9 @@ func (s *UserStore) UpsertByFirebaseIdentity(ctx context.Context, identity auth.
 				where pc.code = users.redeemed_promo_code
 				  and pc.active = true
 			)
-	`, identity.FirebaseUID, identity.Email, identity.DisplayName).Scan(
+		from users
+		where firebase_uid = $1
+	`, firebaseUID).Scan(
 		&user.ID,
 		&user.FirebaseUID,
 		&user.Email,
@@ -54,7 +79,7 @@ func (s *UserStore) UpsertByFirebaseIdentity(ctx context.Context, identity auth.
 		&user.AIAccessEnabled,
 	)
 	if err != nil {
-		return auth.User{}, fmt.Errorf("upsert user by firebase identity: %w", err)
+		return auth.User{}, fmt.Errorf("load user by firebase uid: %w", err)
 	}
 
 	return user, nil
@@ -66,19 +91,33 @@ func (s *UserStore) RedeemPromoCodeForUser(ctx context.Context, user auth.User, 
 		return auth.User{}, auth.ErrPromoCodeNotFound
 	}
 
-	var exists bool
+	var storedCode string
 	if err := s.db.QueryRow(ctx, `
-		select exists(
-			select 1
-			from promo_codes
-			where code = $1 and active = true
-		)
-	`, code).Scan(&exists); err != nil {
+		select code
+		from promo_codes
+		where lower(code) = lower($1)
+		  and active = true
+		limit 1
+	`, code).Scan(&storedCode); err != nil {
+		if strings.Contains(err.Error(), "no rows in result set") {
+			slog.Warn("promo code lookup missed",
+				"user_id", user.ID,
+				"firebase_uid", user.FirebaseUID,
+				"entered_code", rawCode,
+				"normalized_code", code,
+			)
+			return auth.User{}, auth.ErrPromoCodeNotFound
+		}
 		return auth.User{}, fmt.Errorf("check promo code: %w", err)
 	}
-	if !exists {
-		return auth.User{}, auth.ErrPromoCodeNotFound
-	}
+
+	slog.Info("promo code matched",
+		"user_id", user.ID,
+		"firebase_uid", user.FirebaseUID,
+		"entered_code", rawCode,
+		"normalized_code", code,
+		"stored_code", storedCode,
+	)
 
 	var updated auth.User
 	err := s.db.QueryRow(ctx, `
@@ -101,7 +140,7 @@ func (s *UserStore) RedeemPromoCodeForUser(ctx context.Context, user auth.User, 
 				where pc.code = users.redeemed_promo_code
 				  and pc.active = true
 			)
-	`, user.ID, code).Scan(
+	`, user.ID, storedCode).Scan(
 		&updated.ID,
 		&updated.FirebaseUID,
 		&updated.Email,
@@ -115,6 +154,13 @@ func (s *UserStore) RedeemPromoCodeForUser(ctx context.Context, user auth.User, 
 	if err != nil {
 		return auth.User{}, fmt.Errorf("redeem promo code for user: %w", err)
 	}
+
+	slog.Info("promo code persisted for user",
+		"user_id", updated.ID,
+		"firebase_uid", updated.FirebaseUID,
+		"redeemed_promo_code", updated.RedeemedPromoCode,
+		"ai_access_enabled", updated.AIAccessEnabled,
+	)
 
 	return updated, nil
 }
@@ -138,5 +184,5 @@ func (s *UserStore) HasPaidAIAccessForUser(ctx context.Context, user auth.User) 
 }
 
 func normalizePromoCode(code string) string {
-	return strings.ToUpper(strings.TrimSpace(code))
+	return strings.TrimSpace(code)
 }

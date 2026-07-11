@@ -15,16 +15,16 @@ const (
 )
 
 type WorkoutImport struct {
-	Source            string
+	Source             string
 	SourceWorkoutTitle string
-	ScheduledDate     time.Time
-	RescheduledDate   *time.Time
-	WorkoutNotes      string
-	BlockValue        *float64
-	BlockUnits        string
-	BlockInstructions string
-	BlockNotes        string
-	Exercises         []ExerciseImport
+	ScheduledDate      time.Time
+	RescheduledDate    *time.Time
+	WorkoutNotes       string
+	BlockValue         *float64
+	BlockUnits         string
+	BlockInstructions  string
+	BlockNotes         string
+	Exercises          []ExerciseImport
 }
 
 type ExerciseImport struct {

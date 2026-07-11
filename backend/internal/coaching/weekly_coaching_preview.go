@@ -13,22 +13,22 @@ type WeeklyCoachingPreviewStore interface {
 }
 
 type WeeklyCoachingPreviewResult struct {
-	TrainingPlanID  int64
-	CurrentWeek     int
-	PreviewWeek     int
-	PreviewTheme    string
-	Provider        string
-	Model           string
-	PromptVersion   string
-	Feedback        string
-	Motivation      string
+	TrainingPlanID int64
+	CurrentWeek    int
+	PreviewWeek    int
+	PreviewTheme   string
+	Provider       string
+	Model          string
+	PromptVersion  string
+	Feedback       string
+	Motivation     string
 }
 
 type WeeklyCoachingPreviewService struct {
-	store     WeeklyCoachingPreviewStore
-	access    AIAccessStore
-	freeAI    ai.WeeklyCoachingPreviewer
-	paidAI    ai.WeeklyCoachingPreviewer
+	store  WeeklyCoachingPreviewStore
+	access AIAccessStore
+	freeAI ai.WeeklyCoachingPreviewer
+	paidAI ai.WeeklyCoachingPreviewer
 }
 
 func NewWeeklyCoachingPreviewService(store WeeklyCoachingPreviewStore, previewer ai.WeeklyCoachingPreviewer) *WeeklyCoachingPreviewService {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,14 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		})
 		return
 	}
+
+	slog.Info("auth me response",
+		"user_id", user.ID,
+		"firebase_uid", user.FirebaseUID,
+		"email", user.Email,
+		"redeemed_promo_code", user.RedeemedPromoCode,
+		"ai_access_enabled", user.AIAccessEnabled,
+	)
 
 	c.JSON(http.StatusOK, gin.H{
 		"user": user,

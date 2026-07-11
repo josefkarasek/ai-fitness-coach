@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,8 +38,20 @@ func (h *PromoCodeHandler) Redeem(c *gin.Context) {
 		return
 	}
 
+	slog.Info("promo code redeem requested",
+		"user_id", user.ID,
+		"firebase_uid", user.FirebaseUID,
+		"entered_code", body.Code,
+	)
+
 	updatedUser, err := h.store.RedeemPromoCodeForUser(c.Request.Context(), user, body.Code)
 	if err != nil {
+		slog.Error("promo code redeem failed",
+			"user_id", user.ID,
+			"firebase_uid", user.FirebaseUID,
+			"entered_code", body.Code,
+			"error", err,
+		)
 		switch {
 		case errors.Is(err, auth.ErrPromoCodeNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "promo code not found"})
@@ -47,6 +60,13 @@ func (h *PromoCodeHandler) Redeem(c *gin.Context) {
 		}
 		return
 	}
+
+	slog.Info("promo code redeem succeeded",
+		"user_id", updatedUser.ID,
+		"firebase_uid", updatedUser.FirebaseUID,
+		"redeemed_promo_code", updatedUser.RedeemedPromoCode,
+		"ai_access_enabled", updatedUser.AIAccessEnabled,
+	)
 
 	c.JSON(http.StatusOK, gin.H{"user": updatedUser})
 }

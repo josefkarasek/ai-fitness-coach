@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -75,6 +76,12 @@ func (h *TrainingPlansHandler) Create(c *gin.Context) {
 
 	result, err := h.service.GenerateTrainingPlan(c.Request.Context(), user, request)
 	if err != nil {
+		h.logTrainingPlanError("create training plan failed", user, err,
+			"objective", request.Objective,
+			"duration_weeks", request.DurationWeeks,
+			"days_per_week", request.DaysPerWeek,
+			"measurement_system", request.MeasurementSystem,
+		)
 		switch {
 		case errors.Is(err, coaching.ErrDailyTrainingPlanLimitReached):
 			c.JSON(http.StatusTooManyRequests, gin.H{"error": "daily training plan limit reached"})
@@ -98,6 +105,7 @@ func (h *TrainingPlansHandler) Latest(c *gin.Context) {
 
 	result, err := h.service.GetLatestTrainingPlan(c.Request.Context(), user)
 	if err != nil {
+		h.logTrainingPlanError("load latest training plan failed", user, err)
 		switch {
 		case errors.Is(err, coaching.ErrNoTrainingPlanFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "training plan not found"})
@@ -141,6 +149,10 @@ func (h *TrainingPlansHandler) GenerateWeeklyPreview(c *gin.Context) {
 
 	result, err := h.previewer.GenerateForNextWeek(c.Request.Context(), user, trainingPlanID, requestBody.CurrentWeek)
 	if err != nil {
+		h.logTrainingPlanError("generate weekly coaching preview failed", user, err,
+			"training_plan_id", trainingPlanID,
+			"current_week", requestBody.CurrentWeek,
+		)
 		switch {
 		case errors.Is(err, coaching.ErrNoTrainingPlanFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "training plan not found"})
@@ -267,6 +279,12 @@ func (h *TrainingPlansHandler) userAndPlanID(c *gin.Context) (auth.User, int64, 
 }
 
 func (h *TrainingPlansHandler) respondTrainingPlanError(c *gin.Context, err error, fallback string) {
+	user, _ := middleware.UserFromGinContext(c)
+	h.logTrainingPlanError(fallback, user, err,
+		"path", c.FullPath(),
+		"raw_path", c.Request.URL.Path,
+		"method", c.Request.Method,
+	)
 	switch {
 	case errors.Is(err, coaching.ErrDailyTrainingPlanLimitReached):
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "daily training plan limit reached"})
@@ -276,6 +294,25 @@ func (h *TrainingPlansHandler) respondTrainingPlanError(c *gin.Context, err erro
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ai provider is disabled"})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fallback})
+	}
+}
+
+func (h *TrainingPlansHandler) logTrainingPlanError(message string, user auth.User, err error, attrs ...any) {
+	logAttrs := []any{
+		"user_id", user.ID,
+		"firebase_uid", user.FirebaseUID,
+		"email", user.Email,
+		"error", err,
+	}
+	logAttrs = append(logAttrs, attrs...)
+
+	switch {
+	case errors.Is(err, coaching.ErrNoTrainingPlanFound):
+		slog.Info(message, logAttrs...)
+	case errors.Is(err, coaching.ErrDailyTrainingPlanLimitReached), errors.Is(err, ai.ErrProviderDisabled):
+		slog.Warn(message, logAttrs...)
+	default:
+		slog.Error(message, logAttrs...)
 	}
 }
 
