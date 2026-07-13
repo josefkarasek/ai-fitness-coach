@@ -6,10 +6,10 @@ on:
       play_track:
         description: "Google Play track name"
         required: true
-        default: "qa"
+        default: "internal"
         type: choice
         options:
-          - qa
+          - internal
           - alpha
           - beta
           - production
