@@ -6,6 +6,30 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+fun projectPropertyOrEnv(name: String): String? {
+    val propertyValue = findProperty(name) as String?
+    if (!propertyValue.isNullOrBlank()) {
+        return propertyValue
+    }
+
+    val environmentValue = System.getenv(name)
+    if (!environmentValue.isNullOrBlank()) {
+        return environmentValue
+    }
+
+    return null
+}
+
+val releaseStoreFilePath = projectPropertyOrEnv("ANDROID_STORE_FILE")
+val releaseStorePassword = projectPropertyOrEnv("ANDROID_STORE_PASSWORD")
+val releaseKeyAlias = projectPropertyOrEnv("ANDROID_KEY_ALIAS")
+val releaseKeyPassword = projectPropertyOrEnv("ANDROID_KEY_PASSWORD")
+val hasReleaseSigning =
+    !releaseStoreFilePath.isNullOrBlank() &&
+        !releaseStorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank()
+
 android {
     namespace = "com.liftsforge.app"
     compileSdk = flutter.compileSdkVersion
@@ -24,11 +48,25 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFilePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                // Keep local release builds working until a real keystore is provided.
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

@@ -1,0 +1,120 @@
+name: Release Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      play_track:
+        description: "Google Play track name"
+        required: true
+        default: "qa"
+        type: choice
+        options:
+          - qa
+          - alpha
+          - beta
+          - production
+      release_status:
+        description: "Google Play release status"
+        required: true
+        default: "completed"
+        type: choice
+        options:
+          - completed
+          - draft
+          - inProgress
+          - halted
+      user_fraction:
+        description: "Required when release_status is inProgress, for example 0.1"
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: release-android-${{ github.event.inputs.play_track }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client_flutter
+    env:
+      BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
+      ANDROID_STORE_FILE: /tmp/liftsforge-upload-keystore.jks
+      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Validate release configuration
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          RELEASE_STATUS: ${{ github.event.inputs.release_status }}
+          USER_FRACTION: ${{ github.event.inputs.user_fraction }}
+        run: |
+          test -n "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_STORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          if [ "$RELEASE_STATUS" = "inProgress" ]; then
+            test -n "$USER_FRACTION"
+          fi
+
+      - name: Decode upload keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_STORE_FILE"
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze Flutter app
+        run: flutter analyze
+
+      - name: Build signed Android App Bundle
+        run: >
+          flutter build appbundle --release
+          --dart-define=BACKEND_BASE_URL=${BACKEND_BASE_URL}
+
+      - name: Upload bundle to Google Play
+        if: ${{ github.event.inputs.release_status != 'inProgress' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.liftsforge.app
+          releaseFiles: client_flutter/build/app/outputs/bundle/release/app-release.aab
+          track: ${{ github.event.inputs.play_track }}
+          status: ${{ github.event.inputs.release_status }}
+
+      - name: Upload staged rollout bundle to Google Play
+        if: ${{ github.event.inputs.release_status == 'inProgress' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.liftsforge.app
+          releaseFiles: client_flutter/build/app/outputs/bundle/release/app-release.aab
+          track: ${{ github.event.inputs.play_track }}
+          status: ${{ github.event.inputs.release_status }}
+          userFraction: ${{ github.event.inputs.user_fraction }}
