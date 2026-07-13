@@ -23,6 +23,7 @@ func New(
 	r.Use(gin.Logger(), gin.Recovery())
 	if landingHandler != nil {
 		r.GET("/", landingHandler.Home)
+		r.GET("/privacy", landingHandler.Privacy)
 		r.GET("/favicon.svg", landingHandler.Favicon)
 	}
 
