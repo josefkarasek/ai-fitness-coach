@@ -114,7 +114,7 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.liftsforge.app
           releaseFiles: client_flutter/build/app/outputs/bundle/release/app-release.aab
-          track: ${{ github.event.inputs.play_track }}
+          tracks: ${{ github.event.inputs.play_track }}
           status: ${{ github.event.inputs.release_status }}
 
       - name: Upload staged rollout bundle to Google Play
@@ -124,6 +124,6 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.liftsforge.app
           releaseFiles: client_flutter/build/app/outputs/bundle/release/app-release.aab
-          track: ${{ github.event.inputs.play_track }}
+          tracks: ${{ github.event.inputs.play_track }}
           status: ${{ github.event.inputs.release_status }}
           userFraction: ${{ github.event.inputs.user_fraction }}
