@@ -38,6 +38,13 @@ enum _WorkoutFieldKind {
   loadValue,
 }
 
+enum _RootTab {
+  home,
+  program,
+  history,
+  me,
+}
+
 String _formatTrimmedNumber(double value) {
   return value.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
 }
@@ -117,19 +124,12 @@ class _HomeScreenState extends State<HomeScreen>
   PlatformFile? _selectedArchive;
   bool _busy = false;
   String? _status;
-  String? _backendResponse;
-  String? _importResponse;
-  String? _workoutsResponse;
-  String? _workoutLogsResponse;
-  String? _workoutExplanationResponse;
-  String? _trainingPlanResponse;
-  List<_WorkoutHistoryItem> _workouts = <_WorkoutHistoryItem>[];
   List<_WorkoutLogItem> _workoutLogs = <_WorkoutLogItem>[];
   _BackendUserProfile? _backendUser;
-  int? _explainingWorkoutID;
   bool _generatingTrainingPlan = false;
   bool _loadingAppState = true;
   bool _showPlanBuilder = false;
+  _RootTab _selectedRootTab = _RootTab.home;
   String? _selectedWeekday;
   _TrainingPlanResult? _latestTrainingPlan;
   _WeeklyCoachingPreview? _weeklyCoachingPreview;
@@ -201,13 +201,6 @@ class _HomeScreenState extends State<HomeScreen>
       setState(() {
         _loadingAppState = false;
         _showPlanBuilder = false;
-        _backendResponse = null;
-        _importResponse = null;
-        _workoutsResponse = null;
-        _workoutLogsResponse = null;
-        _workoutExplanationResponse = null;
-        _trainingPlanResponse = null;
-        _workouts = <_WorkoutHistoryItem>[];
         _workoutLogs = <_WorkoutLogItem>[];
         _backendUser = null;
         _selectedWeekday = null;
@@ -259,10 +252,6 @@ class _HomeScreenState extends State<HomeScreen>
       );
 
       final String body = response.body;
-      setState(() {
-        _trainingPlanResponse =
-            'HTTP ${response.statusCode}\n${_prettyJsonOrRaw(body)}';
-      });
 
       if (response.statusCode == HttpStatus.notFound) {
         setState(() {
@@ -512,6 +501,14 @@ class _HomeScreenState extends State<HomeScreen>
     final _WeekdayWorkoutSlot? selectedWeekSlot =
         _selectedWeekSlot(currentWeekSlots);
     return Scaffold(
+      bottomNavigationBar: _RootNavigationStrip(
+        selectedTab: _selectedRootTab,
+        onSelected: (_RootTab tab) {
+          setState(() {
+            _selectedRootTab = tab;
+          });
+        },
+      ),
       body: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -524,469 +521,449 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+          child: IndexedStack(
+            index: _selectedRootTab.index,
+            children: <Widget>[
+              _buildHomeTab(
+                context: context,
+                user: user,
+                athleteName: athleteName,
+                plan: plan,
+                currentWeek: currentWeek,
+                currentWeekNumber: currentWeekNumber,
+                displayedWeekNumber: displayedWeekNumber,
+                blockProgress: blockProgress,
+                weeklyStats: weeklyStats,
+                currentWeekSlots: currentWeekSlots,
+                previousWeekSlots: previousWeekSlots,
+                nextWeekSlots: nextWeekSlots,
+                selectedWeekSlot: selectedWeekSlot,
+                workoutLogsForPlan: workoutLogsForPlan,
+                upcomingWorkout: upcomingWorkout,
+                signedIn: signedIn,
+                hasPlan: hasPlan,
+              ),
+              _buildProgramTab(
+                athleteName: athleteName,
+                plan: plan,
+                currentWeek: currentWeek,
+                currentWeekNumber: displayedWeekNumber,
+                upcomingWorkout: upcomingWorkout,
+                blockProgress: blockProgress,
+                completedWorkouts: completedWorkouts,
+              ),
+              _buildHistoryTab(
+                context: context,
+                plan: plan,
+                workoutLogsForPlan: workoutLogsForPlan,
+              ),
+              _buildMeTab(
+                user: user,
+                athleteName: athleteName,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHomeTab({
+    required BuildContext context,
+    required User user,
+    required String athleteName,
+    required _TrainingPlanResult? plan,
+    required _TrainingPlanWeek? currentWeek,
+    required int currentWeekNumber,
+    required int displayedWeekNumber,
+    required double blockProgress,
+    required _WeeklyTrainingStats weeklyStats,
+    required List<_WeekdayWorkoutSlot> currentWeekSlots,
+    required List<_WeekdayWorkoutSlot>? previousWeekSlots,
+    required List<_WeekdayWorkoutSlot>? nextWeekSlots,
+    required _WeekdayWorkoutSlot? selectedWeekSlot,
+    required List<_WorkoutLogItem> workoutLogsForPlan,
+    required _UpcomingWorkoutData? upcomingWorkout,
+    required bool signedIn,
+    required bool hasPlan,
+  }) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _WeeklyProgressStrip(
+            currentWeekNumber: displayedWeekNumber,
+            blockProgress: blockProgress,
+            totalReps: weeklyStats.totalReps,
+            targetReps: weeklyStats.targetReps,
+            totalVolume: weeklyStats.totalVolume,
+            targetVolume: weeklyStats.targetVolume,
+            volumeLabel: weeklyStats.volumeLabel,
+            volumeProgress: weeklyStats.volumeProgress,
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragStart: (_) {
+              _weekStripAnimationController.stop();
+              _weekStripOffsetAnimation = null;
+              _weekStripDragDistance = 0;
+            },
+            onHorizontalDragUpdate: (DragUpdateDetails details) {
+              final double delta = details.primaryDelta ?? 0;
+              _weekStripDragDistance += delta;
+              setState(() {
+                _weekStripOffset += delta;
+              });
+            },
+            onHorizontalDragEnd: (DragEndDetails details) {
+              final double velocity = details.primaryVelocity ?? 0;
+              final double distance = _weekStripDragDistance;
+              _weekStripDragDistance = 0;
+              _handleWeekStripDragEnd(
+                plan: plan,
+                fallbackWeekNumber: currentWeekNumber,
+                viewportWidth: MediaQuery.sizeOf(context).width - 40,
+                velocity: velocity,
+                distance: distance,
+              );
+            },
+            onHorizontalDragCancel: () {
+              _weekStripDragDistance = 0;
+              _animateWeekStripBack();
+            },
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints constraints) {
+                final double width = constraints.maxWidth;
+
+                return ClipRect(
+                  child: SizedBox(
+                    height: 64,
+                    child: Stack(
+                      children: <Widget>[
+                        if (previousWeekSlots != null)
+                          Transform.translate(
+                            offset: Offset(_weekStripOffset - width, 0),
+                            child: _WeekdayWorkoutStrip(
+                              slots: previousWeekSlots,
+                              selectedWeekday: selectedWeekSlot?.weekdayLabel,
+                              onTap: (String weekday) {
+                                setState(() {
+                                  _selectedWeekday = weekday;
+                                });
+                              },
+                              onLongPress: (_WeekdayWorkoutSlot slot) =>
+                                  _handleWeekdayLongPress(
+                                slot,
+                                displayedWeekNumber - 1,
+                              ),
+                            ),
+                          ),
+                        Transform.translate(
+                          offset: Offset(_weekStripOffset, 0),
+                          child: _WeekdayWorkoutStrip(
+                            slots: currentWeekSlots,
+                            selectedWeekday: selectedWeekSlot?.weekdayLabel,
+                            onTap: (String weekday) {
+                              setState(() {
+                                _selectedWeekday = weekday;
+                              });
+                            },
+                            onLongPress: (_WeekdayWorkoutSlot slot) =>
+                                _handleWeekdayLongPress(
+                              slot,
+                              displayedWeekNumber,
+                            ),
+                          ),
+                        ),
+                        if (nextWeekSlots != null)
+                          Transform.translate(
+                            offset: Offset(_weekStripOffset + width, 0),
+                            child: _WeekdayWorkoutStrip(
+                              slots: nextWeekSlots,
+                              selectedWeekday: selectedWeekSlot?.weekdayLabel,
+                              onTap: (String weekday) {
+                                setState(() {
+                                  _selectedWeekday = weekday;
+                                });
+                              },
+                              onLongPress: (_WeekdayWorkoutSlot slot) =>
+                                  _handleWeekdayLongPress(
+                                slot,
+                                displayedWeekNumber + 1,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (plan != null &&
+              selectedWeekSlot != null &&
+              (selectedWeekSlot.loggedWorkout != null ||
+                  selectedWeekSlot.draftSummary != null ||
+                  selectedWeekSlot.workout != null ||
+                  selectedWeekSlot.isCurrentDay)) ...<Widget>[
+            const SizedBox(height: 12),
+            _SelectedDayWorkoutCard(
+              slot: selectedWeekSlot,
+              weekNumber: displayedWeekNumber,
+              currentWeekNumber: currentWeekNumber,
+              upcomingWorkout: upcomingWorkout,
+              onOpenLoggedWorkout: selectedWeekSlot.loggedWorkout == null
+                  ? null
+                  : () => _showWorkoutReviewScreen(
+                        context,
+                        plan,
+                        selectedWeekSlot.loggedWorkout!,
+                      ),
+              onResumeDraft: selectedWeekSlot.draftSummary == null ||
+                      selectedWeekSlot.workout == null
+                  ? null
+                  : () => _showWorkoutPreview(
+                        context,
+                        plan,
+                        _upcomingWorkoutDataFromSlot(
+                          selectedWeekSlot,
+                          displayedWeekNumber,
+                        ),
+                      ),
+              onPreviewWorkout: selectedWeekSlot.workout == null
+                  ? null
+                  : () => _showWorkoutPreview(
+                        context,
+                        plan,
+                        _upcomingWorkoutDataFromSlot(
+                          selectedWeekSlot,
+                          displayedWeekNumber,
+                        ),
+                        existingLog: selectedWeekSlot.loggedWorkout,
+                      ),
+            ),
+          ],
+          if (plan != null &&
+              _weeklyCoachingPreview != null &&
+              displayedWeekNumber == currentWeekNumber) ...<Widget>[
+            const SizedBox(height: 18),
+            _WeeklyTransitionCard(
+              currentWeekNumber: displayedWeekNumber,
+              weeklyPreview: _weeklyCoachingPreview,
+              lastWeekRecap: _lastWeekRecap(
+                plan,
+                workoutLogsForPlan,
+                currentWeekNumber,
+              ),
+              whatChanged: _whatChangedThisWeek(
+                plan,
+                currentWeekNumber,
+              ),
+            ),
+          ],
+          if (_status != null) ...<Widget>[
+            const SizedBox(height: 14),
+            _CoachStatusBanner(message: _status!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgramTab({
+    required String athleteName,
+    required _TrainingPlanResult? plan,
+    required _TrainingPlanWeek? currentWeek,
+    required int currentWeekNumber,
+    required _UpcomingWorkoutData? upcomingWorkout,
+    required double blockProgress,
+    required int completedWorkouts,
+  }) {
+    if (plan == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Generate your first block to unlock the full program view.',
+            style: TextStyle(color: _textSecondary),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return _CoachingBookContent(
+      athleteName: athleteName,
+      plan: plan,
+      currentWeek: currentWeek,
+      currentWeekNumber: currentWeekNumber,
+      weeklyPreview: _weeklyCoachingPreview,
+      programLabel: _programLabel(plan, _backendUser),
+      nextMilestoneTitle: _nextMilestoneTitle(plan, currentWeekNumber),
+      nextMilestoneBody: _nextMilestoneBody(
+        plan,
+        currentWeekNumber,
+        _weeklyCoachingPreview,
+      ),
+      blockProgress: blockProgress,
+      completedWorkouts: completedWorkouts,
+      initialSelectedWeekNumber: currentWeekNumber,
+      topPadding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+    );
+  }
+
+  Widget _buildHistoryTab({
+    required BuildContext context,
+    required _TrainingPlanResult? plan,
+    required List<_WorkoutLogItem> workoutLogsForPlan,
+  }) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const SizedBox(height: 16),
+          const Text(
+            'Previous Workouts',
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              color: _textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            workoutLogsForPlan.isEmpty
+                ? 'Your logged sessions will show up here.'
+                : '${workoutLogsForPlan.length} sessions logged in this block.',
+            style: const TextStyle(
+              fontSize: 15,
+              color: _textSecondary,
+            ),
+          ),
+          const SizedBox(height: 18),
+          if (workoutLogsForPlan.isEmpty)
+            const _Card(
+              child: Text(
+                'No workouts logged yet.',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: _textSecondary,
+                ),
+              ),
+            )
+          else
+            _RecentWorkoutLogsCard(
+              logs: workoutLogsForPlan.reversed.toList(growable: false),
+              onOpenLog: plan == null
+                  ? null
+                  : (_WorkoutLogItem log) =>
+                      _showWorkoutReviewScreen(context, plan, log),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMeTab({
+    required User user,
+    required String athleteName,
+  }) {
+    final String displayName = _backendUser?.displayName.isNotEmpty == true
+        ? _backendUser!.displayName
+        : athleteName;
+    final String email = _backendUser?.email.isNotEmpty == true
+        ? _backendUser!.email
+        : (user.email ?? 'Not available');
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const SizedBox(height: 16),
+          const Text(
+            'Profile',
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              color: _textPrimary,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                _WeeklyProgressStrip(
-                  currentWeekNumber: displayedWeekNumber,
-                  blockProgress: blockProgress,
-                  totalReps: weeklyStats.totalReps,
-                  targetReps: weeklyStats.targetReps,
-                  totalVolume: weeklyStats.totalVolume,
-                  targetVolume: weeklyStats.targetVolume,
-                  volumeLabel: weeklyStats.volumeLabel,
-                  volumeProgress: weeklyStats.volumeProgress,
-                ),
+                const _SectionTitle('Account'),
+                const SizedBox(height: 14),
+                _StatusRow(label: 'Username', value: displayName),
                 const SizedBox(height: 12),
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onHorizontalDragStart: (_) {
-                    _weekStripAnimationController.stop();
-                    _weekStripOffsetAnimation = null;
-                    _weekStripDragDistance = 0;
-                  },
-                  onHorizontalDragUpdate: (DragUpdateDetails details) {
-                    final double delta = details.primaryDelta ?? 0;
-                    _weekStripDragDistance += delta;
-                    setState(() {
-                      _weekStripOffset += delta;
-                    });
-                  },
-                  onHorizontalDragEnd: (DragEndDetails details) {
-                    final double velocity = details.primaryVelocity ?? 0;
-                    final double distance = _weekStripDragDistance;
-                    _weekStripDragDistance = 0;
-                    _handleWeekStripDragEnd(
-                      plan: plan,
-                      fallbackWeekNumber: currentWeekNumber,
-                      viewportWidth: MediaQuery.sizeOf(context).width - 40,
-                      velocity: velocity,
-                      distance: distance,
-                    );
-                  },
-                  onHorizontalDragCancel: () {
-                    _weekStripDragDistance = 0;
-                    _animateWeekStripBack();
-                  },
-                  child: LayoutBuilder(
-                    builder:
-                        (BuildContext context, BoxConstraints constraints) {
-                      final double width = constraints.maxWidth;
-
-                      return ClipRect(
-                        child: SizedBox(
-                          height: 64,
-                          child: Stack(
-                            children: <Widget>[
-                              if (previousWeekSlots != null)
-                                Transform.translate(
-                                  offset: Offset(
-                                    _weekStripOffset - width,
-                                    0,
-                                  ),
-                                  child: _WeekdayWorkoutStrip(
-                                    slots: previousWeekSlots,
-                                    selectedWeekday:
-                                        selectedWeekSlot?.weekdayLabel,
-                                    onTap: (String weekday) {
-                                      setState(() {
-                                        _selectedWeekday = weekday;
-                                      });
-                                    },
-                                    onLongPress: (_WeekdayWorkoutSlot slot) =>
-                                        _handleWeekdayLongPress(
-                                      slot,
-                                      displayedWeekNumber - 1,
-                                    ),
-                                  ),
-                                ),
-                              Transform.translate(
-                                offset: Offset(_weekStripOffset, 0),
-                                child: _WeekdayWorkoutStrip(
-                                  slots: currentWeekSlots,
-                                  selectedWeekday:
-                                      selectedWeekSlot?.weekdayLabel,
-                                  onTap: (String weekday) {
-                                    setState(() {
-                                      _selectedWeekday = weekday;
-                                    });
-                                  },
-                                  onLongPress: (_WeekdayWorkoutSlot slot) =>
-                                      _handleWeekdayLongPress(
-                                    slot,
-                                    displayedWeekNumber,
-                                  ),
-                                ),
-                              ),
-                              if (nextWeekSlots != null)
-                                Transform.translate(
-                                  offset: Offset(
-                                    _weekStripOffset + width,
-                                    0,
-                                  ),
-                                  child: _WeekdayWorkoutStrip(
-                                    slots: nextWeekSlots,
-                                    selectedWeekday:
-                                        selectedWeekSlot?.weekdayLabel,
-                                    onTap: (String weekday) {
-                                      setState(() {
-                                        _selectedWeekday = weekday;
-                                      });
-                                    },
-                                    onLongPress: (_WeekdayWorkoutSlot slot) =>
-                                        _handleWeekdayLongPress(
-                                      slot,
-                                      displayedWeekNumber + 1,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                if (plan != null &&
-                    selectedWeekSlot != null &&
-                    (selectedWeekSlot.loggedWorkout != null ||
-                        selectedWeekSlot.draftSummary != null ||
-                        selectedWeekSlot.workout != null ||
-                        selectedWeekSlot.isCurrentDay)) ...<Widget>[
-                  const SizedBox(height: 12),
-                  _SelectedDayWorkoutCard(
-                    slot: selectedWeekSlot,
-                    weekNumber: displayedWeekNumber,
-                    currentWeekNumber: currentWeekNumber,
-                    upcomingWorkout: upcomingWorkout,
-                    onOpenLoggedWorkout: selectedWeekSlot.loggedWorkout == null
-                        ? null
-                        : () => _showWorkoutReviewScreen(
-                              context,
-                              plan,
-                              selectedWeekSlot.loggedWorkout!,
-                            ),
-                    onResumeDraft: selectedWeekSlot.draftSummary == null ||
-                            selectedWeekSlot.workout == null
-                        ? null
-                        : () => _showWorkoutPreview(
-                              context,
-                              plan,
-                              _upcomingWorkoutDataFromSlot(
-                                selectedWeekSlot,
-                                displayedWeekNumber,
-                              ),
-                            ),
-                    onPreviewWorkout: selectedWeekSlot.workout == null
-                        ? null
-                        : () => _showWorkoutPreview(
-                              context,
-                              plan,
-                              _upcomingWorkoutDataFromSlot(
-                                selectedWeekSlot,
-                                displayedWeekNumber,
-                              ),
-                              existingLog: selectedWeekSlot.loggedWorkout,
-                            ),
-                  ),
-                ],
-                if (plan != null &&
-                    _weeklyCoachingPreview != null &&
-                    displayedWeekNumber == currentWeekNumber) ...<Widget>[
-                  const SizedBox(height: 18),
-                  _WeeklyTransitionCard(
-                    currentWeekNumber: displayedWeekNumber,
-                    totalWeeks: plan.durationWeeks,
-                    phaseLabel: currentWeek?.theme.isNotEmpty == true
-                        ? currentWeek!.theme
-                        : 'Current phase',
-                    weeklyPreview: _weeklyCoachingPreview,
-                    lastWeekRecap: _lastWeekRecap(
-                      plan,
-                      workoutLogsForPlan,
-                      currentWeekNumber,
-                    ),
-                    whatChanged: _whatChangedThisWeek(
-                      plan,
-                      currentWeekNumber,
-                    ),
-                    onReadCoachingBook: () => _showCoachingBookSheet(
-                      context,
-                      plan,
-                      athleteName,
-                      currentWeek,
-                      displayedWeekNumber,
-                      _weeklyCoachingPreview,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 18),
-                _CoachBriefingCard(
-                  athleteName: athleteName,
-                  currentWeekNumber: displayedWeekNumber,
-                  totalWeeks: plan?.durationWeeks ?? 12,
-                  phaseLabel: currentWeek?.theme.isNotEmpty == true
-                      ? currentWeek!.theme
-                      : 'Awaiting current phase',
-                  programLabel: _programLabel(plan, _backendUser),
-                  blockProgress: blockProgress,
-                  completedWorkouts: completedWorkouts,
-                  totalPlannedWorkouts: plan?.totalPlannedWorkouts ?? 0,
-                  objective: plan?.objective ?? 'Build your first block',
-                  previewObjective:
-                      _coachingBookObjective(currentWeek, upcomingWorkout),
-                  nextMilestoneTitle: _nextMilestoneTitle(
-                    plan,
-                    displayedWeekNumber,
-                  ),
-                  nextMilestoneBody: _nextMilestoneBody(
-                    plan,
-                    displayedWeekNumber,
-                    _weeklyCoachingPreview,
-                  ),
-                  weeklyPreview: _weeklyCoachingPreview,
-                  onReadCoachingBook: plan == null
-                      ? null
-                      : () => _showCoachingBookSheet(
-                            context,
-                            plan,
-                            athleteName,
-                            currentWeek,
-                            displayedWeekNumber,
-                            _weeklyCoachingPreview,
-                          ),
-                ),
-                if (_status != null) ...<Widget>[
-                  const SizedBox(height: 14),
-                  _CoachStatusBanner(message: _status!),
-                ],
-                const SizedBox(height: 16),
-                _Card(
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: <Widget>[
-                      FilledButton(
-                        onPressed: !signedIn || _busy
-                            ? null
-                            : () {
-                                setState(() {
-                                  _showPlanBuilder = true;
-                                });
-                              },
-                        child: _InlineBusyLabel(
-                          busy: _generatingTrainingPlan,
-                          idleLabel: hasPlan
-                              ? 'Generate new block'
-                              : 'Create first block',
-                          busyLabel: hasPlan
-                              ? 'Generating block...'
-                              : 'Creating block...',
-                        ),
-                      ),
-                      OutlinedButton(
-                        onPressed:
-                            !signedIn || _busy ? null : _loadLatestTrainingPlan,
-                        child: const Text('Load latest block'),
-                      ),
-                    ],
-                  ),
-                ),
-                if (workoutLogsForPlan.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 16),
-                  _RecentWorkoutLogsCard(
-                    logs: workoutLogsForPlan.reversed.take(3).toList(),
-                    onOpenLog: plan == null
-                        ? null
-                        : (_WorkoutLogItem log) =>
-                            _showWorkoutReviewScreen(context, plan, log),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                _Card(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      const _SectionTitle('Coach Tools'),
-                      const SizedBox(height: 10),
-                      Text(
-                        '${user.email ?? athleteName} · ${plan?.provider ?? 'coach'}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: _textMuted,
-                        ),
-                      ),
-                      if (_backendUser != null) ...<Widget>[
-                        const SizedBox(height: 8),
-                        Text(
-                          _backendUser!.redeemedPromoCode.isEmpty
-                              ? 'Promo code: none'
-                              : 'Promo code: ${_backendUser!.redeemedPromoCode}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: _textMuted,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _backendUser!.aiAccessEnabled
-                              ? 'Paid AI access: enabled'
-                              : 'Paid AI access: disabled',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: _backendUser!.aiAccessEnabled
-                                ? _accentGreen
-                                : _textMuted,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: <Widget>[
-                          OutlinedButton(
-                            onPressed: _busy
-                                ? null
-                                : () {
-                                    setState(() {
-                                      _showPlanBuilder = true;
-                                    });
-                                  },
-                            child: const Text('Generate New Block'),
-                          ),
-                          OutlinedButton(
-                            onPressed: _busy
-                                ? null
-                                : _importPastExercisesFromEmptyState,
-                            child: const Text('Import History'),
-                          ),
-                          OutlinedButton(
-                            onPressed: _busy || plan == null
-                                ? null
-                                : _generateWeeklyBriefingForTesting,
-                            child: const Text('Generate Briefing'),
-                          ),
-                          TextButton(
-                            onPressed: _busy ? null : _signOut,
-                            child: const Text('Sign Out'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _Card(
-                  child: ExpansionTile(
-                    tilePadding: EdgeInsets.zero,
-                    childrenPadding: EdgeInsets.zero,
-                    title: const _SectionTitle('Import & Tools'),
-                    subtitle: const Text(
-                      'History import and backend diagnostics stay here when you need them.',
-                      style: TextStyle(color: _textMuted),
-                    ),
-                    children: <Widget>[
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: <Widget>[
-                          OutlinedButton(
-                            onPressed: _busy ? null : _callBackend,
-                            child: const Text('Check Backend'),
-                          ),
-                          OutlinedButton(
-                            onPressed: _busy ? null : _pickArchive,
-                            child: const Text('Pick Zip'),
-                          ),
-                          FilledButton(
-                            onPressed: _busy || _selectedArchive == null
-                                ? null
-                                : _uploadArchive,
-                            child: const Text('Upload Zip'),
-                          ),
-                          OutlinedButton(
-                            onPressed: _busy ? null : _loadLatestTrainingPlan,
-                            child: const Text('Load Latest Block'),
-                          ),
-                          OutlinedButton(
-                            onPressed: _busy ? null : _loadWorkouts,
-                            child: const Text('Load History'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _StatusRow(
-                        label: 'Selected archive',
-                        value: _selectedArchive == null
-                            ? 'No file selected'
-                            : '${_selectedArchive!.name} (${_formatBytes(_selectedArchive!.size)})',
-                      ),
-                      if (_workouts.isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 20),
-                        for (final _WorkoutHistoryItem workout
-                            in _workouts.take(3)) ...<Widget>[
-                          _WorkoutCard(
-                            workout: workout,
-                            busy: _busy && _explainingWorkoutID == workout.id,
-                            onExplain: () => _explainWorkout(workout),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      ],
-                      if (_backendResponse != null) ...<Widget>[
-                        const SizedBox(height: 12),
-                        _DebugBlock(
-                          title: 'GET /api/v1/me',
-                          body: _backendResponse!,
-                        ),
-                      ],
-                      if (_importResponse != null) ...<Widget>[
-                        const SizedBox(height: 12),
-                        _DebugBlock(
-                          title: 'POST /api/v1/imports',
-                          body: _importResponse!,
-                        ),
-                      ],
-                      if (_workoutsResponse != null) ...<Widget>[
-                        const SizedBox(height: 12),
-                        _DebugBlock(
-                          title: 'GET /api/v1/workouts',
-                          body: _workoutsResponse!,
-                        ),
-                      ],
-                      if (_workoutLogsResponse != null) ...<Widget>[
-                        const SizedBox(height: 12),
-                        _DebugBlock(
-                          title: 'Workout log responses',
-                          body: _workoutLogsResponse!,
-                        ),
-                      ],
-                      if (_trainingPlanResponse != null) ...<Widget>[
-                        const SizedBox(height: 12),
-                        _DebugBlock(
-                          title: 'Training plan responses',
-                          body: _trainingPlanResponse!,
-                        ),
-                      ],
-                      if (_workoutExplanationResponse != null) ...<Widget>[
-                        const SizedBox(height: 12),
-                        _DebugBlock(
-                          title: 'Workout explanation responses',
-                          body: _workoutExplanationResponse!,
-                        ),
-                      ],
-                    ],
-                  ),
+                _StatusRow(label: 'Email', value: email),
+                const SizedBox(height: 12),
+                _StatusRow(
+                  label: 'Measurement system',
+                  value: _deviceMeasurementSystem,
                 ),
               ],
             ),
           ),
-        ),
+          const SizedBox(height: 16),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('Coaching Profile'),
+                const SizedBox(height: 14),
+                _StatusRow(
+                  label: 'Training experience',
+                  value: _backendUser?.trainingExperience.isNotEmpty == true
+                      ? _backendUser!.trainingExperience
+                      : 'Not set',
+                ),
+                const SizedBox(height: 12),
+                _StatusRow(
+                  label: 'Primary goal',
+                  value: _backendUser?.primaryGoal.isNotEmpty == true
+                      ? _backendUser!.primaryGoal
+                      : 'Not set',
+                ),
+                const SizedBox(height: 12),
+                _StatusRow(
+                  label: 'Preferred days',
+                  value: _backendUser?.preferredDays.isNotEmpty == true
+                      ? _backendUser!.preferredDays.join(', ')
+                      : 'Not set',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('Access'),
+                const SizedBox(height: 14),
+                _StatusRow(
+                  label: 'Promo code',
+                  value: _backendUser?.redeemedPromoCode.isNotEmpty == true
+                      ? _backendUser!.redeemedPromoCode
+                      : 'None',
+                ),
+                const SizedBox(height: 12),
+                _StatusRow(
+                  label: 'AI access',
+                  value: _backendUser?.aiAccessEnabled == true
+                      ? 'Enabled'
+                      : 'Disabled',
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1654,20 +1631,6 @@ class _HomeScreenState extends State<HomeScreen>
     return 'Coached Progression';
   }
 
-  String _coachingBookObjective(
-    _TrainingPlanWeek? currentWeek,
-    _UpcomingWorkoutData? upcomingWorkout,
-  ) {
-    if (currentWeek != null && currentWeek.weekNumber <= 2) {
-      return 'Develop movement quality before intensity increases.';
-    }
-    if (upcomingWorkout != null && upcomingWorkout.focus.isNotEmpty) {
-      return _firstSentence(upcomingWorkout.focus);
-    }
-
-    return 'Build repeatable training quality before the next phase begins.';
-  }
-
   int _nextMilestoneWeekNumber(
     _TrainingPlanResult? plan,
     int currentWeekNumber,
@@ -1914,6 +1877,9 @@ class _HomeScreenState extends State<HomeScreen>
       int currentWeekNumber,
       _WeeklyCoachingPreview? weeklyPreview,
       {int? initialSelectedWeekNumber}) async {
+    final int completedWorkouts = _workoutLogs
+        .where((_WorkoutLogItem item) => item.trainingPlanID == plan.planID)
+        .length;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) {
@@ -1930,6 +1896,8 @@ class _HomeScreenState extends State<HomeScreen>
               currentWeekNumber,
               weeklyPreview,
             ),
+            blockProgress: _blockProgress(plan, completedWorkouts),
+            completedWorkouts: completedWorkouts,
             initialSelectedWeekNumber: initialSelectedWeekNumber,
           );
         },
@@ -2067,7 +2035,6 @@ class _HomeScreenState extends State<HomeScreen>
         final String token = await _requireIdToken();
         await _redeemPromoCode(token, promoCode);
       }
-      _setStatus('Account created and signed in.');
     });
   }
 
@@ -2082,7 +2049,6 @@ class _HomeScreenState extends State<HomeScreen>
         final String token = await _requireIdToken();
         await _redeemPromoCode(token, promoCode);
       }
-      _setStatus('Signed in successfully.');
     });
   }
 
@@ -2126,94 +2092,6 @@ class _HomeScreenState extends State<HomeScreen>
       _backendUser = _BackendUserProfile.fromJson(
         Map<String, dynamic>.from(userValue),
       );
-    });
-  }
-
-  Future<void> _signOut() async {
-    await _runBusyAction(() async {
-      await _auth.signOut();
-      await widget.preferences.setOnboardingCompleted(false);
-      await widget.preferences.setLastSignedInUid('');
-      setState(() {
-        _loadingAppState = false;
-        _showPlanBuilder = false;
-        _backendResponse = null;
-        _importResponse = null;
-        _workoutsResponse = null;
-        _workoutLogsResponse = null;
-        _workoutExplanationResponse = null;
-        _trainingPlanResponse = null;
-        _workouts = <_WorkoutHistoryItem>[];
-        _workoutLogs = <_WorkoutLogItem>[];
-        _backendUser = null;
-        _latestTrainingPlan = null;
-        _weeklyCoachingPreview = null;
-        _activeDisplayedWeekNumber = null;
-        _activeDisplayedWeekPlanID = null;
-      });
-      _setStatus('Signed out.');
-    });
-  }
-
-  Future<void> _callBackend() async {
-    await _runBusyAction(() async {
-      final String token = await _requireIdToken();
-      await _loadBackendUserProfile(token);
-    });
-  }
-
-  Future<void> _pickArchive() async {
-    await _runBusyAction(() async {
-      final FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const <String>['zip'],
-        withData: true,
-      );
-
-      if (result == null || result.files.isEmpty) {
-        _setStatus('Zip selection cancelled.');
-        return;
-      }
-
-      setState(() {
-        _selectedArchive = result.files.single;
-        _importResponse = null;
-      });
-      _setStatus('Selected ${_selectedArchive!.name}.');
-    });
-  }
-
-  Future<void> _uploadArchive() async {
-    await _runBusyAction(() async {
-      await _uploadArchiveWithCurrentSelection();
-    });
-  }
-
-  Future<void> _loadWorkouts() async {
-    await _runBusyAction(() async {
-      final String token = await _requireIdToken();
-      final Uri uri = Uri.parse(_workoutsUrlController.text.trim());
-      final http.Response response = await _performRequest(
-        () => http.get(
-          uri,
-          headers: <String, String>{
-            HttpHeaders.authorizationHeader: 'Bearer $token',
-          },
-        ),
-        action: 'load workout history',
-      );
-
-      final String body = response.body;
-      final List<_WorkoutHistoryItem> workouts =
-          _parseWorkoutHistoryFromResponse(body);
-
-      setState(() {
-        _workouts = workouts;
-        _workoutExplanationResponse = null;
-        _workoutsResponse =
-            'HTTP ${response.statusCode}\n${_prettyJsonOrRaw(body)}';
-      });
-      _setStatus('Workout history loaded.');
     });
   }
 
@@ -2315,7 +2193,6 @@ class _HomeScreenState extends State<HomeScreen>
 
       setState(() {
         _selectedArchive = result.files.single;
-        _importResponse = null;
       });
 
       await _uploadArchiveWithCurrentSelection(announceStatus: false);
@@ -2369,10 +2246,6 @@ class _HomeScreenState extends State<HomeScreen>
         );
 
         final String body = response.body;
-        setState(() {
-          _trainingPlanResponse =
-              'HTTP ${response.statusCode}\n${_prettyJsonOrRaw(body)}';
-        });
 
         if (response.statusCode == 429) {
           _setStatus(
@@ -2693,10 +2566,6 @@ class _HomeScreenState extends State<HomeScreen>
       );
 
       final String body = response.body;
-      setState(() {
-        _trainingPlanResponse =
-            'HTTP ${response.statusCode}\n${_prettyJsonOrRaw(body)}';
-      });
 
       if (!expectedStatusCodes.contains(response.statusCode)) {
         throw _UiException(_formatBackendFailure(
@@ -2767,10 +2636,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
     final String body = await response.stream.bytesToString();
 
-    setState(() {
-      _importResponse =
-          'HTTP ${response.statusCode}\n${_prettyJsonOrRaw(body)}';
-    });
     if (announceStatus) {
       _setStatus('Training import request completed.');
     }
@@ -2781,57 +2646,6 @@ class _HomeScreenState extends State<HomeScreen>
         responseBody: body,
       ));
     }
-  }
-
-  Future<void> _loadLatestTrainingPlan() async {
-    await _runBusyAction(() async {
-      final String token = await _requireIdToken();
-      final Uri uri = Uri.parse(_trainingPlansLatestUrlController.text.trim());
-      final http.Response response = await _performRequest(
-        () => http.get(
-          uri,
-          headers: <String, String>{
-            HttpHeaders.authorizationHeader: 'Bearer $token',
-          },
-        ),
-        action: 'load the latest training plan',
-      );
-
-      final String body = response.body;
-      setState(() {
-        _trainingPlanResponse =
-            'HTTP ${response.statusCode}\n${_prettyJsonOrRaw(body)}';
-      });
-
-      if (response.statusCode >= 400) {
-        throw _UiException(_formatBackendFailure(
-          action: 'load the latest training plan',
-          response: response,
-        ));
-      }
-
-      final _TrainingPlanResult? plan = _parseTrainingPlanFromResponse(body);
-      if (plan == null) {
-        _setStatus('Latest training plan response did not include plan data.');
-        return;
-      }
-
-      setState(() {
-        _latestTrainingPlan = plan;
-      });
-      final User? currentUser = _auth.currentUser;
-      if (currentUser != null) {
-        await widget.localCacheRepository.cacheTrainingPlan(
-          planId: plan.planID,
-          firebaseUid: currentUser.uid,
-          payloadJson: body,
-        );
-      }
-      await _loadWorkoutLogsForPlan(token, plan.planID, announceStatus: false);
-      await _syncDisplayedWeekForCurrentPlan();
-      await _maybeLoadWeeklyCoachingPreview(token, plan);
-      _setStatus('Latest training plan loaded.');
-    });
   }
 
   Future<_WorkoutLogItem?> _saveWorkoutLog(_WorkoutLogDraft draft) async {
@@ -2858,10 +2672,6 @@ class _HomeScreenState extends State<HomeScreen>
         );
 
         final String body = response.body;
-        setState(() {
-          _workoutLogsResponse =
-              'HTTP ${response.statusCode}\n${_prettyJsonOrRaw(body)}';
-        });
 
         if (response.statusCode >= 400) {
           throw _UiException(_formatBackendFailure(
@@ -2958,10 +2768,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     final String body = response.body;
-    setState(() {
-      _workoutLogsResponse =
-          'HTTP ${response.statusCode}\n${_prettyJsonOrRaw(body)}';
-    });
 
     if (response.statusCode >= 400) {
       throw _UiException(_formatBackendFailure(
@@ -3120,85 +2926,6 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  Future<void> _generateWeeklyBriefingForTesting() async {
-    final _TrainingPlanResult? plan = _latestTrainingPlan;
-    if (plan == null) {
-      throw const _UiException('Load or generate a block first.');
-    }
-
-    await _runBusyAction(() async {
-      final String token = await _requireIdToken();
-      await _maybeLoadWeeklyCoachingPreview(token, plan, force: true);
-      if (_weeklyCoachingPreview == null) {
-        _setStatus('Weekly briefing was not returned.');
-        return;
-      }
-      _setStatus('Weekly briefing generated for testing.');
-    });
-  }
-
-  Future<void> _explainWorkout(_WorkoutHistoryItem workout) async {
-    await _runBusyAction(() async {
-      final String token = await _requireIdToken();
-      final Uri uri = _buildWorkoutExplanationUri(workout.id);
-      final http.Response response = await _performRequest(
-        () => http.post(
-          uri,
-          headers: <String, String>{
-            HttpHeaders.authorizationHeader: 'Bearer $token',
-          },
-        ),
-        action: 'generate the workout explanation',
-      );
-
-      final String body = response.body;
-      setState(() {
-        _workoutExplanationResponse =
-            'HTTP ${response.statusCode}\n${_prettyJsonOrRaw(body)}';
-      });
-
-      if (response.statusCode >= 400) {
-        throw _UiException(_formatBackendFailure(
-          action: 'generate the workout explanation',
-          response: response,
-        ));
-      }
-
-      final _WorkoutExplanationResult? explanation =
-          _parseWorkoutExplanationFromResponse(body);
-      if (explanation == null) {
-        _setStatus(
-            'Workout explanation response did not include explanation data.');
-        return;
-      }
-
-      setState(() {
-        _workouts = _workouts
-            .map(
-              (_WorkoutHistoryItem item) => item.id == workout.id
-                  ? item.copyWith(explanation: explanation)
-                  : item,
-            )
-            .toList();
-      });
-
-      _setStatus(explanation.generated
-          ? 'Workout explanation generated.'
-          : 'Stored workout explanation loaded.');
-    }, workoutID: workout.id);
-  }
-
-  Uri _buildWorkoutExplanationUri(int workoutID) {
-    final Uri workoutsUri = Uri.parse(_workoutsUrlController.text.trim());
-    final String normalizedPath = workoutsUri.path.endsWith('/')
-        ? workoutsUri.path.substring(0, workoutsUri.path.length - 1)
-        : workoutsUri.path;
-
-    return workoutsUri.replace(
-      path: '$normalizedPath/$workoutID/explanation',
-    );
-  }
-
   Future<String> _requireIdToken() async {
     final User? user = _auth.currentUser;
     if (user == null) {
@@ -3228,13 +2955,11 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _runBusyAction(
-    Future<void> Function() action, {
-    int? workoutID,
-  }) async {
+    Future<void> Function() action,
+  ) async {
     setState(() {
       _busy = true;
       _status = null;
-      _explainingWorkoutID = workoutID;
     });
 
     try {
@@ -3251,7 +2976,6 @@ class _HomeScreenState extends State<HomeScreen>
       if (mounted) {
         setState(() {
           _busy = false;
-          _explainingWorkoutID = null;
         });
       }
     }
@@ -3419,51 +3143,6 @@ class _HomeScreenState extends State<HomeScreen>
           duration: const Duration(seconds: 3),
         ),
       );
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) {
-      return '$bytes B';
-    }
-    if (bytes < 1024 * 1024) {
-      return '${(bytes / 1024).toStringAsFixed(1)} KiB';
-    }
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MiB';
-  }
-
-  String _prettyJsonOrRaw(String body) {
-    try {
-      final Object? decoded = jsonDecode(body);
-      return const JsonEncoder.withIndent('  ').convert(decoded);
-    } catch (_) {
-      return body;
-    }
-  }
-
-  List<_WorkoutHistoryItem> _parseWorkoutHistoryFromResponse(String body) {
-    final Object? decoded = jsonDecode(body);
-    if (decoded is! Map<String, dynamic>) {
-      return <_WorkoutHistoryItem>[];
-    }
-
-    final Object? workoutsValue = decoded['workouts'];
-    if (workoutsValue is! List<dynamic>) {
-      return <_WorkoutHistoryItem>[];
-    }
-
-    return workoutsValue
-        .whereType<Map<String, dynamic>>()
-        .map(_WorkoutHistoryItem.fromJson)
-        .toList();
-  }
-
-  _WorkoutExplanationResult? _parseWorkoutExplanationFromResponse(String body) {
-    final Object? decoded = jsonDecode(body);
-    if (decoded is! Map<String, dynamic>) {
-      return null;
-    }
-
-    return _WorkoutExplanationResult.fromJson(decoded);
   }
 
   _TrainingPlanResult? _parseTrainingPlanFromResponse(String body) {
@@ -4337,10 +4016,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     final String body = response.body;
-    setState(() {
-      _backendResponse =
-          'HTTP ${response.statusCode}\n${_prettyJsonOrRaw(body)}';
-    });
 
     if (response.statusCode >= 400) {
       throw _UiException(_formatBackendFailure(
@@ -4915,6 +4590,13 @@ class _SelectedDayWorkoutCard extends StatelessWidget {
       }
       primaryAction = OutlinedButton(
         onPressed: onOpenLoggedWorkout,
+        style: OutlinedButton.styleFrom(
+          backgroundColor: _surfaceRaised,
+          foregroundColor: _textPrimary,
+          side: BorderSide(
+            color: _accentGreen.withValues(alpha: 0.38),
+          ),
+        ),
         child: const Text('Open Review'),
       );
     } else if (slot.draftSummary != null) {
@@ -5179,6 +4861,73 @@ class _SelectedDayWorkoutCard extends StatelessWidget {
   }
 }
 
+class _RootNavigationStrip extends StatelessWidget {
+  const _RootNavigationStrip({
+    required this.selectedTab,
+    required this.onSelected,
+  });
+
+  final _RootTab selectedTab;
+  final ValueChanged<_RootTab> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    const List<(_RootTab, IconData, String)> items =
+        <(_RootTab, IconData, String)>[
+      (_RootTab.home, Icons.home_rounded, 'Home'),
+      (_RootTab.program, Icons.menu_book_rounded, 'Program'),
+      (_RootTab.history, Icons.history_rounded, 'History'),
+      (_RootTab.me, Icons.person_rounded, 'Me'),
+    ];
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: _outline),
+        ),
+        child: Row(
+          children: items.map(((_RootTab, IconData, String) item) {
+            final _RootTab tab = item.$1;
+            final bool isSelected = tab == selectedTab;
+            final Color color = isSelected ? _accentGreen : _textMuted;
+
+            return Expanded(
+              child: InkWell(
+                onTap: () => onSelected(tab),
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(item.$2, size: 20, color: color),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.$3,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight:
+                              isSelected ? FontWeight.w800 : FontWeight.w600,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(growable: false),
+        ),
+      ),
+    );
+  }
+}
+
 class _DetailPill extends StatelessWidget {
   const _DetailPill({required this.label});
 
@@ -5278,21 +5027,15 @@ class _MiniProgressRingPainter extends CustomPainter {
 class _WeeklyTransitionCard extends StatelessWidget {
   const _WeeklyTransitionCard({
     required this.currentWeekNumber,
-    required this.totalWeeks,
-    required this.phaseLabel,
     required this.weeklyPreview,
     required this.lastWeekRecap,
     required this.whatChanged,
-    required this.onReadCoachingBook,
   });
 
   final int currentWeekNumber;
-  final int totalWeeks;
-  final String phaseLabel;
   final _WeeklyCoachingPreview? weeklyPreview;
   final String lastWeekRecap;
   final String whatChanged;
-  final VoidCallback? onReadCoachingBook;
 
   @override
   Widget build(BuildContext context) {
@@ -5313,7 +5056,7 @@ class _WeeklyTransitionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const Text(
-            'Week Transition',
+            'Weekly Briefing',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
@@ -5322,20 +5065,11 @@ class _WeeklyTransitionCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'Week $currentWeekNumber of $totalWeeks',
+            'Week $currentWeekNumber',
             style: const TextStyle(
-              fontSize: 28,
+              fontSize: 24,
               fontWeight: FontWeight.w800,
               color: _textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            phaseLabel,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: _accentGreen,
             ),
           ),
           const SizedBox(height: 18),
@@ -5343,13 +5077,13 @@ class _WeeklyTransitionCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const _SectionTitle('Last Week Recap'),
+                const _SectionTitle('Carry Forward'),
                 const SizedBox(height: 12),
                 Text(
                   lastWeekRecap,
                   style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.6,
+                    fontSize: 15,
+                    height: 1.55,
                     color: _textSecondary,
                   ),
                 ),
@@ -5361,15 +5095,15 @@ class _WeeklyTransitionCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const _SectionTitle('This Week\'s Briefing'),
+                const _SectionTitle('This Week'),
                 const SizedBox(height: 12),
                 Text(
                   hasGeneratedBriefing
                       ? feedback
-                      : 'Your coach is preparing this week\'s briefing. Open the coaching book to stay anchored in the plan until the note arrives.',
+                      : 'Your coach is preparing this week\'s note. Stay anchored in the plan and keep the work crisp until it lands.',
                   style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.6,
+                    fontSize: 15,
+                    height: 1.55,
                     color: _textSecondary,
                   ),
                 ),
@@ -5386,8 +5120,8 @@ class _WeeklyTransitionCard extends StatelessWidget {
                 Text(
                   whatChanged,
                   style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.6,
+                    fontSize: 15,
+                    height: 1.55,
                     color: _textSecondary,
                   ),
                 ),
@@ -5414,44 +5148,13 @@ class _WeeklyTransitionCard extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 16),
-          InkWell(
-            onTap: onReadCoachingBook,
-            borderRadius: BorderRadius.circular(999),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Text(
-                    'Read Coaching Book',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: onReadCoachingBook == null
-                          ? _textMuted
-                          : _accentGreen.withValues(alpha: 0.95),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 18,
-                    color: onReadCoachingBook == null
-                        ? _textMuted
-                        : _accentGreen.withValues(alpha: 0.95),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-class _CoachingBookScreen extends StatefulWidget {
+class _CoachingBookScreen extends StatelessWidget {
   const _CoachingBookScreen({
     required this.athleteName,
     required this.plan,
@@ -5461,6 +5164,8 @@ class _CoachingBookScreen extends StatefulWidget {
     required this.programLabel,
     required this.nextMilestoneTitle,
     required this.nextMilestoneBody,
+    required this.blockProgress,
+    required this.completedWorkouts,
     this.initialSelectedWeekNumber,
   });
 
@@ -5472,13 +5177,76 @@ class _CoachingBookScreen extends StatefulWidget {
   final String programLabel;
   final String nextMilestoneTitle;
   final String nextMilestoneBody;
+  final double blockProgress;
+  final int completedWorkouts;
   final int? initialSelectedWeekNumber;
 
   @override
-  State<_CoachingBookScreen> createState() => _CoachingBookScreenState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _bgTop,
+      appBar: AppBar(
+        backgroundColor: _bgTop,
+        surfaceTintColor: Colors.transparent,
+        title: const Text(
+          'Coaching Book',
+          style: TextStyle(color: _textPrimary),
+        ),
+      ),
+      body: SafeArea(
+        child: _CoachingBookContent(
+          athleteName: athleteName,
+          plan: plan,
+          currentWeek: currentWeek,
+          currentWeekNumber: currentWeekNumber,
+          weeklyPreview: weeklyPreview,
+          programLabel: programLabel,
+          nextMilestoneTitle: nextMilestoneTitle,
+          nextMilestoneBody: nextMilestoneBody,
+          blockProgress: blockProgress,
+          completedWorkouts: completedWorkouts,
+          initialSelectedWeekNumber: initialSelectedWeekNumber,
+          topPadding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        ),
+      ),
+    );
+  }
 }
 
-class _CoachingBookScreenState extends State<_CoachingBookScreen> {
+class _CoachingBookContent extends StatefulWidget {
+  const _CoachingBookContent({
+    required this.athleteName,
+    required this.plan,
+    required this.currentWeek,
+    required this.currentWeekNumber,
+    required this.weeklyPreview,
+    required this.programLabel,
+    required this.nextMilestoneTitle,
+    required this.nextMilestoneBody,
+    required this.blockProgress,
+    required this.completedWorkouts,
+    required this.topPadding,
+    this.initialSelectedWeekNumber,
+  });
+
+  final String athleteName;
+  final _TrainingPlanResult plan;
+  final _TrainingPlanWeek? currentWeek;
+  final int currentWeekNumber;
+  final _WeeklyCoachingPreview? weeklyPreview;
+  final String programLabel;
+  final String nextMilestoneTitle;
+  final String nextMilestoneBody;
+  final double blockProgress;
+  final int completedWorkouts;
+  final int? initialSelectedWeekNumber;
+  final EdgeInsets topPadding;
+
+  @override
+  State<_CoachingBookContent> createState() => _CoachingBookContentState();
+}
+
+class _CoachingBookContentState extends State<_CoachingBookContent> {
   late int _selectedWeekNumber;
 
   @override
@@ -5486,6 +5254,15 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
     super.initState();
     _selectedWeekNumber =
         widget.initialSelectedWeekNumber ?? widget.currentWeekNumber;
+  }
+
+  @override
+  void didUpdateWidget(covariant _CoachingBookContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final int maxWeek = math.max(widget.plan.durationWeeks, 1);
+    if (_selectedWeekNumber > maxWeek) {
+      _selectedWeekNumber = maxWeek;
+    }
   }
 
   @override
@@ -5498,466 +5275,453 @@ class _CoachingBookScreenState extends State<_CoachingBookScreen> {
         _coachingBookWeek(widget.plan, nextWeekNumber);
     final _TrainingPlanWeek? selectedWeek =
         _coachingBookWeek(widget.plan, _selectedWeekNumber);
-    final String weeklyFeedback = widget.weeklyPreview?.feedback.trim() ?? '';
-    final String weeklyMotivation =
-        widget.weeklyPreview?.motivation.trim() ?? '';
-    final bool hasWeeklyBriefing =
-        weeklyFeedback.isNotEmpty || weeklyMotivation.isNotEmpty;
     final bool selectedWeekIsCurrent =
         selectedWeek?.weekNumber == widget.currentWeekNumber;
+    final int progressPercent =
+        (widget.blockProgress.clamp(0, 1) * 100).round();
+    final String currentTheme = widget.currentWeek?.theme.trim() ?? '';
+    final String overviewLabel = currentTheme.isNotEmpty
+        ? currentTheme
+        : 'Current focus is set by the active week in your block.';
 
-    return Scaffold(
-      backgroundColor: _bgTop,
-      appBar: AppBar(
-        backgroundColor: _bgTop,
-        surfaceTintColor: Colors.transparent,
-        title: const Text(
-          'Coaching Book',
-          style: TextStyle(color: _textPrimary),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const _CoachPill(label: 'Coaching Book'),
-              const SizedBox(height: 16),
-              Text(
-                'Written for ${widget.athleteName}',
-                style: const TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  color: _textPrimary,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '${widget.plan.durationWeeks} weeks • ${widget.programLabel}',
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: _textSecondary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              if (hasWeeklyBriefing) ...<Widget>[
-                _Card(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        widget.weeklyPreview?.currentWeek ==
-                                widget.currentWeekNumber
-                            ? 'This Week\'s Briefing'
-                            : 'Coach Briefing',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _textMuted,
-                        ),
+    return SingleChildScrollView(
+      padding: widget.topPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const SizedBox(height: 16),
+          const Text(
+            'Coaching Book',
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              color: _textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${widget.plan.durationWeeks} weeks • ${widget.programLabel} • written for ${widget.athleteName}',
+            style: const TextStyle(
+              fontSize: 15,
+              color: _textSecondary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('Block Overview'),
+                const SizedBox(height: 12),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: _StatusRow(
+                        label: 'Current position',
+                        value:
+                            'Week ${widget.currentWeekNumber} of ${widget.plan.durationWeeks}',
                       ),
-                      if (weeklyFeedback.isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 12),
-                        Text(
-                          weeklyFeedback,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            height: 1.6,
-                            color: _textSecondary,
-                          ),
-                        ),
-                      ],
-                      if (weeklyMotivation.isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 14),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: _surfaceRaised,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: _outlineSoft),
-                          ),
-                          child: Text(
-                            weeklyMotivation,
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 1.55,
-                              color: _accentGreen.withValues(alpha: 0.94),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _StatusRow(
+                        label: 'Completed',
+                        value:
+                            '${widget.completedWorkouts}/${widget.plan.totalPlannedWorkouts} workouts',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  overviewLabel,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    height: 1.6,
+                    color: _textSecondary,
                   ),
                 ),
                 const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: widget.blockProgress.clamp(0, 1),
+                    minHeight: 10,
+                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      _accentGreen,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '$progressPercent% of the block completed',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: _textMuted,
+                  ),
+                ),
               ],
-              _Card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    const _SectionTitle('Program Objective'),
-                    const SizedBox(height: 12),
-                    Text(
-                      widget.plan.objective,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        height: 1.35,
-                        color: _textPrimary,
-                      ),
-                    ),
-                    if (widget.plan.summary.trim().isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 12),
-                      Text(
-                        widget.plan.summary.trim(),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: _textSecondary,
-                        ),
-                      ),
-                    ],
-                  ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('Program Objective'),
+                const SizedBox(height: 12),
+                Text(
+                  widget.plan.objective,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                    color: _textPrimary,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _Card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    const _SectionTitle('Why This Block Exists'),
-                    const SizedBox(height: 12),
-                    Text(
-                      _coachingBookBlockExplanation(widget.plan),
-                      style: const TextStyle(
-                        fontSize: 15,
-                        height: 1.6,
-                        color: _textSecondary,
-                      ),
+                if (widget.plan.summary.trim().isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.plan.summary.trim(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: _textSecondary,
                     ),
-                    if (widget.plan.progressionStrategy
-                        .trim()
-                        .isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Progression',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.plan.progressionStrategy.trim(),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: _textSecondary,
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('Why This Block Exists'),
+                const SizedBox(height: 12),
+                Text(
+                  _coachingBookBlockExplanation(widget.plan),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    height: 1.6,
+                    color: _textSecondary,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              if (selectedWeek != null) ...<Widget>[
-                _Card(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      const _SectionTitle('Week Timeline'),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: widget.plan.weeks
-                            .map(
-                              (_TrainingPlanWeek week) => InkWell(
-                                onTap: () {
-                                  setState(() {
-                                    _selectedWeekNumber = week.weekNumber;
-                                  });
-                                },
+                if (widget.plan.progressionStrategy
+                    .trim()
+                    .isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Progression',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.plan.progressionStrategy.trim(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: _textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (selectedWeek != null) ...<Widget>[
+            _Card(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const _SectionTitle('Week Timeline'),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: widget.plan.weeks
+                        .map(
+                          (_TrainingPlanWeek week) => InkWell(
+                            onTap: () {
+                              setState(() {
+                                _selectedWeekNumber = week.weekNumber;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(999),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: week.weekNumber == _selectedWeekNumber
+                                    ? _accentGreen.withValues(alpha: 0.18)
+                                    : _surfaceRaised,
                                 borderRadius: BorderRadius.circular(999),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        week.weekNumber == _selectedWeekNumber
-                                            ? _accentGreen.withValues(
-                                                alpha: 0.18,
-                                              )
-                                            : _surfaceRaised,
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(
+                                border: Border.all(
+                                  color: week.weekNumber == _selectedWeekNumber
+                                      ? _accentGreen
+                                      : _outlineSoft,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  Text(
+                                    '${week.weekNumber}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
                                       color:
                                           week.weekNumber == _selectedWeekNumber
                                               ? _accentGreen
-                                              : _outlineSoft,
+                                              : _textPrimary,
                                     ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: <Widget>[
-                                      Text(
-                                        '${week.weekNumber}',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w800,
-                                          color: week.weekNumber ==
-                                                  _selectedWeekNumber
-                                              ? _accentGreen
-                                              : _textPrimary,
-                                        ),
+                                  if (week.weekNumber ==
+                                      widget.currentWeekNumber) ...<Widget>[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFFFD166),
+                                        shape: BoxShape.circle,
                                       ),
-                                      if (week.weekNumber ==
-                                          widget.currentWeekNumber) ...<Widget>[
-                                        const SizedBox(width: 6),
-                                        Container(
-                                          width: 6,
-                                          height: 6,
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xFFFFD166),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
+                                    ),
+                                  ],
+                                ],
                               ),
-                            )
-                            .toList(growable: false),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Week ${selectedWeek.weekNumber}${selectedWeek.weekNumber == widget.currentWeekNumber ? ' · current' : ''}',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: selectedWeek.weekNumber ==
-                                  widget.currentWeekNumber
-                              ? _accentGreen
-                              : _textPrimary,
-                        ),
-                      ),
-                      if (selectedWeek.theme.trim().isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 8),
-                        Text(
-                          selectedWeek.theme.trim(),
-                          style: const TextStyle(
-                            fontSize: 15,
-                            height: 1.5,
-                            color: _textSecondary,
+                            ),
                           ),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Why This Week Matters',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _coachingBookWeekExplanation(
-                          selectedWeek,
-                          selectedWeekIsCurrent: selectedWeekIsCurrent,
-                          weeklyPreview: widget.weeklyPreview,
-                        ),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: _textSecondary,
-                        ),
-                      ),
-                      if (selectedWeek.workouts.isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 16),
-                        const _SectionTitle('Planned Workouts'),
-                        const SizedBox(height: 12),
-                        for (int index = 0;
-                            index < selectedWeek.workouts.length;
-                            index++) ...<Widget>[
-                          _CoachingBookWorkoutRow(
-                            workout: selectedWeek.workouts[index],
-                          ),
-                          if (index != selectedWeek.workouts.length - 1)
-                            const SizedBox(height: 12),
-                        ],
-                      ] else ...<Widget>[
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No workouts are scheduled for this week yet.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 1.5,
-                            color: _textMuted,
-                          ),
-                        ),
-                      ],
-                    ],
+                        )
+                        .toList(growable: false),
                   ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              _Card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    const _SectionTitle('Next Milestone'),
-                    const SizedBox(height: 12),
-                    Text(
-                      widget.nextMilestoneTitle,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: _textPrimary,
-                      ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Week ${selectedWeek.weekNumber}${selectedWeek.weekNumber == widget.currentWeekNumber ? ' · active in the block' : ''}',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: selectedWeek.weekNumber == widget.currentWeekNumber
+                          ? _accentGreen
+                          : _textPrimary,
                     ),
-                    if (nextWeek != null &&
-                        nextWeek.theme.trim().isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 8),
-                      Text(
-                        nextWeek.theme.trim(),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: _accentBlue,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
+                  ),
+                  if (selectedWeek.theme.trim().isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 8),
                     Text(
-                      widget.nextMilestoneBody,
+                      selectedWeek.theme.trim(),
                       style: const TextStyle(
                         fontSize: 15,
-                        height: 1.6,
+                        height: 1.5,
                         color: _textSecondary,
                       ),
                     ),
-                    if (widget.weeklyPreview != null &&
-                        widget.weeklyPreview!.previewWeek == nextWeekNumber &&
-                        widget.weeklyPreview!.previewTheme
-                            .trim()
-                            .isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Preview theme',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.weeklyPreview!.previewTheme.trim(),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: _accentBlue,
-                        ),
-                      ),
-                    ],
                   ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              _Card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    const _SectionTitle('Coach\'s Lens'),
-                    if (widget.plan.philosophy.trim().isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 12),
-                      Text(
-                        widget.plan.philosophy.trim(),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: _textSecondary,
-                        ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Why This Week Matters',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _coachingBookWeekExplanation(
+                      selectedWeek,
+                      selectedWeekIsCurrent: selectedWeekIsCurrent,
+                      weeklyPreview: widget.weeklyPreview,
+                    ),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: _textSecondary,
+                    ),
+                  ),
+                  if (selectedWeek.workouts.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 16),
+                    const _SectionTitle('Planned Workouts'),
+                    const SizedBox(height: 12),
+                    for (int index = 0;
+                        index < selectedWeek.workouts.length;
+                        index++) ...<Widget>[
+                      _CoachingBookWorkoutRow(
+                        workout: selectedWeek.workouts[index],
                       ),
+                      if (index != selectedWeek.workouts.length - 1)
+                        const SizedBox(height: 12),
                     ],
-                    if (widget.plan.progressionStrategy
-                        .trim()
-                        .isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Progression strategy',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _textMuted,
-                        ),
+                  ] else ...<Widget>[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'No workouts are scheduled for this week yet.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                        color: _textMuted,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.plan.progressionStrategy.trim(),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: _textSecondary,
-                        ),
-                      ),
-                    ],
-                    if (widget.plan.successCriteria
-                        .trim()
-                        .isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 16),
-                      const Text(
-                        'What success looks like',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.plan.successCriteria.trim(),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: _textSecondary,
-                        ),
-                      ),
-                    ],
+                    ),
                   ],
-                ),
+                ],
               ),
-              if (widget.plan.risks.trim().isNotEmpty) ...<Widget>[
-                const SizedBox(height: 16),
-                _Card(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      const _SectionTitle('Risks & Watchouts'),
-                      const SizedBox(height: 12),
-                      Text(
-                        widget.plan.risks.trim(),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: _textSecondary,
-                        ),
-                      ),
-                    ],
+            ),
+          ],
+          const SizedBox(height: 16),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('Next Milestone'),
+                const SizedBox(height: 12),
+                Text(
+                  widget.nextMilestoneTitle,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _textPrimary,
                   ),
                 ),
+                if (nextWeek != null &&
+                    nextWeek.theme.trim().isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 8),
+                  Text(
+                    nextWeek.theme.trim(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: _accentBlue,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Text(
+                  widget.nextMilestoneBody,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    height: 1.6,
+                    color: _textSecondary,
+                  ),
+                ),
+                if (widget.weeklyPreview != null &&
+                    widget.weeklyPreview!.previewWeek == nextWeekNumber &&
+                    widget.weeklyPreview!.previewTheme
+                        .trim()
+                        .isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Preview theme',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.weeklyPreview!.previewTheme.trim(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: _accentBlue,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
+          const SizedBox(height: 16),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('Coach\'s Lens'),
+                if (widget.plan.philosophy.trim().isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.plan.philosophy.trim(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: _textSecondary,
+                    ),
+                  ),
+                ],
+                if (widget.plan.progressionStrategy
+                    .trim()
+                    .isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Progression strategy',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.plan.progressionStrategy.trim(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: _textSecondary,
+                    ),
+                  ),
+                ],
+                if (widget.plan.successCriteria.trim().isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'What success looks like',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.plan.successCriteria.trim(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: _textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (widget.plan.risks.trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 16),
+            _Card(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const _SectionTitle('Risks & Watchouts'),
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.plan.risks.trim(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: _textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -6110,337 +5874,6 @@ class _CoachingBookWorkoutRow extends StatelessWidget {
   }
 }
 
-class _CoachBriefingCard extends StatelessWidget {
-  const _CoachBriefingCard({
-    required this.athleteName,
-    required this.currentWeekNumber,
-    required this.totalWeeks,
-    required this.phaseLabel,
-    required this.programLabel,
-    required this.blockProgress,
-    required this.completedWorkouts,
-    required this.totalPlannedWorkouts,
-    required this.objective,
-    required this.previewObjective,
-    required this.nextMilestoneTitle,
-    required this.nextMilestoneBody,
-    required this.weeklyPreview,
-    required this.onReadCoachingBook,
-  });
-
-  final String athleteName;
-  final int currentWeekNumber;
-  final int totalWeeks;
-  final String phaseLabel;
-  final String programLabel;
-  final double blockProgress;
-  final int completedWorkouts;
-  final int totalPlannedWorkouts;
-  final String objective;
-  final String previewObjective;
-  final String nextMilestoneTitle;
-  final String nextMilestoneBody;
-  final _WeeklyCoachingPreview? weeklyPreview;
-  final VoidCallback? onReadCoachingBook;
-
-  @override
-  Widget build(BuildContext context) {
-    final int progressPercent = (blockProgress.clamp(0, 1) * 100).round();
-    final int completedWeeks = math.min(
-      totalWeeks,
-      math.max(currentWeekNumber - 1, 0),
-    );
-    final int currentWeekIndex = math.min(
-      math.max(currentWeekNumber - 1, 0),
-      math.max(totalWeeks - 1, 0),
-    );
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const Text(
-            'Coaching Book Preview',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: _textMuted,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const _BookDivider(),
-          Text(
-            '$totalWeeks Week Program',
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: _textPrimary,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            programLabel,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: _textPrimary,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'Week $currentWeekNumber',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: _textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            phaseLabel,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: _accentGreen,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const _BookDivider(),
-          const SizedBox(height: 16),
-          const Text(
-            'Week',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: _textMuted,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: List<Widget>.generate(totalWeeks, (int index) {
-              final bool isCurrent = index == currentWeekIndex;
-              final Color textColor = isCurrent
-                  ? _textPrimary
-                  : index < completedWeeks
-                      ? _accentGreen
-                      : _textMuted;
-              return Expanded(
-                child: Center(
-                  child: Text(
-                    '${index + 1}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-                      color: textColor,
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: List<Widget>.generate(totalWeeks, (int index) {
-              final bool isComplete = index < completedWeeks;
-              final bool isCurrent = index == currentWeekIndex;
-              final Color color =
-                  isComplete || isCurrent ? _accentGreen : _outlineSoft;
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    right: index == totalWeeks - 1 ? 0 : 4,
-                  ),
-                  child: Container(
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: <Widget>[
-              const Text(
-                'Current',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _textMuted,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '$progressPercent%',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: _textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const _BookDivider(),
-          const SizedBox(height: 16),
-          const Text(
-            'Objective',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: _textMuted,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            objective,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              height: 1.35,
-              color: _textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            previewObjective,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: _textSecondary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const _BookDivider(),
-          const SizedBox(height: 16),
-          const Text(
-            'Next milestone',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: _textMuted,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            nextMilestoneTitle,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              height: 1.4,
-              color: _textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            nextMilestoneBody,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: _textSecondary,
-            ),
-          ),
-          if (weeklyPreview != null &&
-              weeklyPreview!.previewWeek == currentWeekNumber + 1 &&
-              weeklyPreview!.motivation.trim().isNotEmpty) ...<Widget>[
-            const SizedBox(height: 12),
-            Text(
-              weeklyPreview!.motivation.trim(),
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.5,
-                color: _accentGreen.withValues(alpha: 0.92),
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          const _BookDivider(),
-          const SizedBox(height: 14),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  '$completedWorkouts / $totalPlannedWorkouts workouts completed',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: _textSecondary,
-                  ),
-                ),
-              ),
-              Text(
-                '$progressPercent%',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: _textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          InkWell(
-            onTap: onReadCoachingBook,
-            borderRadius: BorderRadius.circular(999),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Text(
-                    'Read Coaching Book',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: onReadCoachingBook == null
-                          ? _textMuted
-                          : _accentGreen.withValues(alpha: 0.95),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 18,
-                    color: onReadCoachingBook == null
-                        ? _textMuted
-                        : _accentGreen.withValues(alpha: 0.95),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BookDivider extends StatelessWidget {
-  const _BookDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: 1,
-      decoration: BoxDecoration(
-        color: _outlineSoft,
-        borderRadius: BorderRadius.circular(999),
-      ),
-    );
-  }
-}
-
 class _CoachStatusBanner extends StatelessWidget {
   const _CoachStatusBanner({required this.message});
 
@@ -6526,89 +5959,6 @@ class _MetricCard extends StatelessWidget {
   }
 }
 
-class _DebugBlock extends StatelessWidget {
-  const _DebugBlock({
-    required this.title,
-    required this.body,
-  });
-
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _surfaceAlt,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: _textMuted,
-            ),
-          ),
-          const SizedBox(height: 8),
-          SelectableText(
-            body,
-            style: const TextStyle(
-              fontSize: 13,
-              height: 1.45,
-              color: _textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InlineBusyLabel extends StatelessWidget {
-  const _InlineBusyLabel({
-    required this.busy,
-    required this.idleLabel,
-    required this.busyLabel,
-  });
-
-  final bool busy;
-  final String idleLabel;
-  final String busyLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!busy) {
-      return Text(
-        idleLabel,
-        style: const TextStyle(fontWeight: FontWeight.w700),
-      );
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        const SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          busyLabel,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ],
-    );
-  }
-}
-
 class _Card extends StatelessWidget {
   const _Card({required this.child});
 
@@ -6679,309 +6029,6 @@ class _StatusRow extends StatelessWidget {
         ),
       ],
     );
-  }
-}
-
-class _WorkoutCard extends StatelessWidget {
-  const _WorkoutCard({
-    required this.workout,
-    required this.busy,
-    required this.onExplain,
-  });
-
-  final _WorkoutHistoryItem workout;
-  final bool busy;
-  final VoidCallback? onExplain;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            workout.dateLabel,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: _textMuted,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            workout.title,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: _textPrimary,
-            ),
-          ),
-          if (workout.workoutNotes.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 8),
-            Text(
-              workout.workoutNotes,
-              style: const TextStyle(
-                fontSize: 14,
-                height: 1.4,
-                color: _textSecondary,
-              ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: <Widget>[
-              FilledButton.tonal(
-                onPressed: busy ? null : onExplain,
-                child: Text(
-                  workout.explanation == null
-                      ? 'Explain workout'
-                      : 'Reload explanation',
-                ),
-              ),
-              if (busy)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-            ],
-          ),
-          if (workout.explanation != null) ...<Widget>[
-            const SizedBox(height: 14),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: _surfaceRaised,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _outline),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    workout.explanation!.generated
-                        ? 'New Coaching Explanation'
-                        : 'Stored Coaching Explanation',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: _accentGreen,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    workout.explanation!.text,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.45,
-                      color: _textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${workout.explanation!.provider} · ${workout.explanation!.model} · ${workout.explanation!.usageLabel}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: _textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          for (final _WorkoutExerciseItem exercise
-              in workout.exercises) ...<Widget>[
-            Text(
-              '${exercise.sequenceNumber}. ${exercise.title}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: _textPrimary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            if (exercise.summary.isNotEmpty)
-              Text(
-                exercise.summary,
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.4,
-                  color: _textSecondary,
-                ),
-              ),
-            if (exercise.notes.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 2),
-              Text(
-                exercise.notes,
-                style: const TextStyle(
-                  fontSize: 13,
-                  height: 1.4,
-                  color: _textMuted,
-                ),
-              ),
-            ],
-            const SizedBox(height: 10),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _WorkoutHistoryItem {
-  const _WorkoutHistoryItem({
-    required this.id,
-    required this.title,
-    required this.dateLabel,
-    required this.workoutNotes,
-    required this.exercises,
-    required this.explanation,
-  });
-
-  factory _WorkoutHistoryItem.fromJson(Map<String, dynamic> json) {
-    final Object? exercisesValue = json['exercises'];
-    final List<_WorkoutExerciseItem> exercises = exercisesValue is List<dynamic>
-        ? exercisesValue
-            .whereType<Map<String, dynamic>>()
-            .map(_WorkoutExerciseItem.fromJson)
-            .toList()
-        : <_WorkoutExerciseItem>[];
-
-    return _WorkoutHistoryItem(
-      id: (json['id'] as num?)?.toInt() ?? 0,
-      title: (json['source_workout_title'] as String?) ?? 'Untitled workout',
-      dateLabel: (json['scheduled_date'] as String?) ?? '',
-      workoutNotes: (json['workout_notes'] as String?) ?? '',
-      exercises: exercises,
-      explanation: null,
-    );
-  }
-
-  final int id;
-  final String title;
-  final String dateLabel;
-  final String workoutNotes;
-  final List<_WorkoutExerciseItem> exercises;
-  final _WorkoutExplanationResult? explanation;
-
-  _WorkoutHistoryItem copyWith({
-    _WorkoutExplanationResult? explanation,
-  }) {
-    return _WorkoutHistoryItem(
-      id: id,
-      title: title,
-      dateLabel: dateLabel,
-      workoutNotes: workoutNotes,
-      exercises: exercises,
-      explanation: explanation ?? this.explanation,
-    );
-  }
-}
-
-class _WorkoutExerciseItem {
-  const _WorkoutExerciseItem({
-    required this.sequenceNumber,
-    required this.title,
-    required this.notes,
-    required this.summary,
-  });
-
-  factory _WorkoutExerciseItem.fromJson(Map<String, dynamic> json) {
-    final Object? setsValue = json['sets'];
-    final List<_WorkoutSetItem> sets = setsValue is List<dynamic>
-        ? setsValue
-            .whereType<Map<String, dynamic>>()
-            .map(_WorkoutSetItem.fromJson)
-            .toList()
-        : <_WorkoutSetItem>[];
-
-    return _WorkoutExerciseItem(
-      sequenceNumber: (json['sequence_number'] as num?)?.toInt() ?? 0,
-      title: (json['title'] as String?) ?? 'Untitled exercise',
-      notes: (json['notes'] as String?) ?? '',
-      summary: sets.map((_WorkoutSetItem set) => set.label).join(' | '),
-    );
-  }
-
-  final int sequenceNumber;
-  final String title;
-  final String notes;
-  final String summary;
-}
-
-class _WorkoutSetItem {
-  const _WorkoutSetItem({required this.label});
-
-  factory _WorkoutSetItem.fromJson(Map<String, dynamic> json) {
-    final String rawPrimaryValue = (json['raw_primary_value'] as String?) ?? '';
-    final String rawLoadValue = (json['raw_load_value'] as String?) ?? '';
-    final String measurementUnit = (json['measurement_unit'] as String?) ?? '';
-
-    String label = rawPrimaryValue;
-    if (measurementUnit.isNotEmpty) {
-      label = label.isEmpty ? measurementUnit : '$label $measurementUnit';
-    }
-    if (rawLoadValue.isNotEmpty) {
-      label = label.isEmpty ? rawLoadValue : '$label @ $rawLoadValue';
-    }
-
-    return _WorkoutSetItem(
-      label: label.isEmpty ? 'Set' : label,
-    );
-  }
-
-  final String label;
-}
-
-class _WorkoutExplanationResult {
-  const _WorkoutExplanationResult({
-    required this.generated,
-    required this.provider,
-    required this.model,
-    required this.text,
-    required this.dailyLimit,
-    required this.generatedToday,
-    required this.remainingToday,
-  });
-
-  factory _WorkoutExplanationResult.fromJson(Map<String, dynamic> json) {
-    return _WorkoutExplanationResult(
-      generated: json['generated'] as bool? ?? false,
-      provider: (json['provider'] as String?) ?? 'unknown',
-      model: (json['model'] as String?) ?? 'unknown',
-      text: (json['explanation'] as String?) ?? '',
-      dailyLimit: (json['daily_limit'] as num?)?.toInt() ?? 0,
-      generatedToday: (json['generated_today'] as num?)?.toInt() ?? 0,
-      remainingToday: (json['remaining_today'] as num?)?.toInt() ?? 0,
-    );
-  }
-
-  final bool generated;
-  final String provider;
-  final String model;
-  final String text;
-  final int dailyLimit;
-  final int generatedToday;
-  final int remainingToday;
-
-  String get usageLabel {
-    if (dailyLimit <= 0) {
-      return 'quota not configured';
-    }
-
-    return '$generatedToday/$dailyLimit used today, $remainingToday left';
   }
 }
 

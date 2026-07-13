@@ -51,6 +51,7 @@ func main() {
 	}
 
 	healthHandler := httpHandlers.NewHealthHandler(db)
+	landingHandler := httpHandlers.NewLandingHandler()
 	authHandler := httpHandlers.NewAuthHandler()
 	userStore := postgres.NewUserStore(db)
 	promoCodeHandler := httpHandlers.NewPromoCodeHandler(userStore)
@@ -111,7 +112,7 @@ func main() {
 		coaching.NewWeeklyCoachingPreviewServiceWithAccessControl(trainingPlanStore, userStore, freeWeeklyCoachingPreviewer, paidWeeklyCoachingPreviewer),
 	)
 
-	router := httpRouter.New(healthHandler, authHandler, promoCodeHandler, importHandler, workoutsHandler, workoutLogsHandler, workoutExplanationHandler, plannedExerciseExplanationHandler, trainingPlansHandler, authentication)
+	router := httpRouter.New(landingHandler, healthHandler, authHandler, promoCodeHandler, importHandler, workoutsHandler, workoutLogsHandler, workoutExplanationHandler, plannedExerciseExplanationHandler, trainingPlansHandler, authentication)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddress(),

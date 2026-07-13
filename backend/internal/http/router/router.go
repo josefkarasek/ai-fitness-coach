@@ -7,6 +7,7 @@ import (
 )
 
 func New(
+	landingHandler *handlers.LandingHandler,
 	healthHandler *handlers.HealthHandler,
 	authHandler *handlers.AuthHandler,
 	promoCodeHandler *handlers.PromoCodeHandler,
@@ -20,6 +21,9 @@ func New(
 ) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
+	if landingHandler != nil {
+		r.GET("/", landingHandler.Home)
+	}
 
 	v1 := r.Group("/api/v1")
 	{

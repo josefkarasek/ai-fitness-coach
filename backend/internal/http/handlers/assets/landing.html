@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LiftsForge</title>
+    <meta
+      name="description"
+      content="LiftsForge writes coaching books, not workout lists. AI strength coaching forged from your training history."
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07090d;
+        --bg-soft: #0d1218;
+        --surface: rgba(18, 24, 32, 0.84);
+        --surface-strong: #121922;
+        --surface-soft: rgba(255, 255, 255, 0.04);
+        --line: rgba(255, 255, 255, 0.11);
+        --line-strong: rgba(255, 255, 255, 0.18);
+        --text: #eef2f7;
+        --text-soft: #b6c0cc;
+        --text-muted: #7d8a99;
+        --accent: #4fd3a1;
+        --accent-soft: rgba(79, 211, 161, 0.12);
+        --accent-warm: #e6cf91;
+        --blueprint: rgba(101, 132, 173, 0.08);
+        --shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+        --radius-xl: 28px;
+        --radius-lg: 22px;
+        --radius-md: 16px;
+        --container: 1120px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(79, 211, 161, 0.08), transparent 28%),
+          radial-gradient(circle at top right, rgba(230, 207, 145, 0.08), transparent 24%),
+          linear-gradient(180deg, #06080c 0%, #0a0f14 42%, #07090d 100%);
+        color: var(--text);
+        min-height: 100vh;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 1;
+        background:
+          repeating-linear-gradient(
+            115deg,
+            transparent 0 42px,
+            rgba(255, 255, 255, 0.015) 42px 43px
+          ),
+          repeating-linear-gradient(
+            0deg,
+            transparent 0 36px,
+            rgba(101, 132, 173, 0.03) 36px 37px
+          ),
+          radial-gradient(circle at 20% 15%, var(--blueprint) 0 2px, transparent 2px),
+          radial-gradient(circle at 80% 70%, var(--blueprint) 0 2px, transparent 2px);
+        background-size: auto, auto, 180px 180px, 220px 220px;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .container {
+        width: min(var(--container), calc(100% - 40px));
+        margin: 0 auto;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        backdrop-filter: blur(16px);
+        background: rgba(7, 9, 13, 0.68);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 16px 0;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 1.05rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .brand-mark {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background:
+          linear-gradient(145deg, rgba(79, 211, 161, 0.16), rgba(79, 211, 161, 0.02)),
+          rgba(255, 255, 255, 0.03);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      }
+
+      .brand-mark span {
+        color: var(--accent);
+        font-size: 1.15rem;
+        font-weight: 800;
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
+
+      .nav-links a {
+        color: var(--text-soft);
+        font-size: 0.95rem;
+      }
+
+      .nav-links a:hover {
+        color: var(--text);
+      }
+
+      .button,
+      .button-secondary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        border-radius: 999px;
+        padding: 13px 22px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+      }
+
+      .button:hover,
+      .button-secondary:hover {
+        transform: translateY(-1px);
+      }
+
+      .button {
+        color: #08110d;
+        background: linear-gradient(135deg, var(--accent), #86e5bf);
+        box-shadow: 0 10px 30px rgba(79, 211, 161, 0.28);
+      }
+
+      .button-secondary {
+        color: var(--text);
+        border: 1px solid var(--line-strong);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .hero {
+        padding: 92px 0 72px;
+      }
+
+      .hero-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+        gap: 36px;
+        align-items: stretch;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        color: var(--accent);
+        background: var(--accent-soft);
+        border: 1px solid rgba(79, 211, 161, 0.22);
+        font-size: 0.85rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      .hero h1 {
+        margin: 22px 0 18px;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(3rem, 7vw, 5.2rem);
+        line-height: 0.95;
+        letter-spacing: -0.03em;
+      }
+
+      .hero-copy {
+        font-size: 1.18rem;
+        line-height: 1.75;
+        color: var(--text-soft);
+        max-width: 620px;
+      }
+
+      .hero-copy strong {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .hero-rule {
+        width: min(520px, 100%);
+        height: 1px;
+        margin: 34px 0 24px;
+        background: linear-gradient(90deg, rgba(230, 207, 145, 0.5), transparent);
+      }
+
+      .hero-checks {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 14px;
+      }
+
+      .hero-checks li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        color: var(--text-soft);
+        font-size: 1rem;
+      }
+
+      .hero-checks li::before {
+        content: "✓";
+        color: var(--accent);
+        font-weight: 800;
+      }
+
+      .hero-actions {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-top: 30px;
+      }
+
+      .panel {
+        position: relative;
+        border-radius: var(--radius-xl);
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, rgba(18, 25, 34, 0.88), rgba(10, 14, 20, 0.94));
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 22%),
+          radial-gradient(circle at top right, rgba(79, 211, 161, 0.16), transparent 30%);
+        pointer-events: none;
+      }
+
+      .hero-panel {
+        padding: 26px;
+      }
+
+      .quote-card {
+        border-radius: 22px;
+        padding: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .quote-card p {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 1.55rem;
+        line-height: 1.45;
+        color: var(--text);
+      }
+
+      .hero-note {
+        margin-top: 18px;
+        color: var(--text-muted);
+        font-size: 0.98rem;
+        line-height: 1.7;
+      }
+
+      section {
+        padding: 34px 0;
+      }
+
+      .section-heading {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 24px;
+      }
+
+      .section-heading span {
+        color: var(--accent);
+        font-size: 0.85rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .section-heading h2 {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(2rem, 3.8vw, 3rem);
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+      }
+
+      .section-heading p {
+        margin: 0;
+        color: var(--text-soft);
+        font-size: 1.03rem;
+        line-height: 1.75;
+        max-width: 760px;
+      }
+
+      .story-grid,
+      .feature-grid,
+      .comparison-grid,
+      .audience-grid,
+      .privacy-grid {
+        display: grid;
+        gap: 20px;
+      }
+
+      .story-grid {
+        grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      }
+
+      .flow-card,
+      .feature-card,
+      .comparison-card,
+      .audience-card,
+      .privacy-card,
+      .notebook-card,
+      .phone-card {
+        padding: 24px;
+      }
+
+      .flow {
+        display: grid;
+        gap: 14px;
+      }
+
+      .flow-step {
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        gap: 14px;
+        align-items: center;
+      }
+
+      .flow-step .step-index {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        color: var(--accent);
+        background: rgba(79, 211, 161, 0.08);
+        border: 1px solid rgba(79, 211, 161, 0.22);
+        font-weight: 800;
+      }
+
+      .flow-step strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 1rem;
+      }
+
+      .flow-step p,
+      .feature-card p,
+      .comparison-card p,
+      .audience-card p,
+      .privacy-card p {
+        margin: 0;
+        color: var(--text-soft);
+        line-height: 1.7;
+      }
+
+      .phone-card {
+        position: relative;
+        min-height: 540px;
+        background:
+          radial-gradient(circle at top, rgba(230, 207, 145, 0.08), transparent 32%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015));
+      }
+
+      .phone-shell {
+        width: min(100%, 360px);
+        margin: 0 auto;
+        border-radius: 34px;
+        padding: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        background: linear-gradient(180deg, #11171f, #0b1016);
+        box-shadow: 0 24px 44px rgba(0, 0, 0, 0.38);
+      }
+
+      .phone-screen {
+        border-radius: 24px;
+        padding: 20px;
+        background: linear-gradient(180deg, #141c25, #0f151c);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .screen-label {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .screen-title {
+        margin: 14px 0 16px;
+        font-size: 1.55rem;
+        font-weight: 800;
+      }
+
+      .exercise-card {
+        padding: 18px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .exercise-card pre,
+      .exercise-why pre,
+      .book-preview pre,
+      .progress-flow pre {
+        margin: 0;
+        white-space: pre-wrap;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        line-height: 1.7;
+        color: var(--text-soft);
+        font-size: 0.96rem;
+      }
+
+      .exercise-why {
+        margin-top: 14px;
+        padding: 18px;
+        border-radius: 18px;
+        background: rgba(79, 211, 161, 0.08);
+        border: 1px solid rgba(79, 211, 161, 0.18);
+      }
+
+      .notebook-card {
+        position: relative;
+        min-height: 100%;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%),
+          linear-gradient(90deg, rgba(230, 207, 145, 0.08), transparent 38%),
+          #0d1218;
+      }
+
+      .notebook-card::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 52px;
+        width: 1px;
+        background: rgba(230, 207, 145, 0.18);
+      }
+
+      .book-preview {
+        position: relative;
+        z-index: 1;
+        border-radius: 20px;
+        padding: 26px 24px 24px 80px;
+        background:
+          repeating-linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.018) 0 30px,
+            rgba(255, 255, 255, 0.018) 30px 31px
+          );
+      }
+
+      .feature-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .feature-card h3,
+      .comparison-card h3,
+      .audience-card h3,
+      .privacy-card h3 {
+        margin: 0 0 10px;
+        font-size: 1.2rem;
+      }
+
+      .feature-kicker {
+        display: inline-block;
+        margin-bottom: 12px;
+        color: var(--accent);
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .progress-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 20px;
+      }
+
+      .progress-flow {
+        display: grid;
+        gap: 16px;
+      }
+
+      .progress-card-title {
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.8rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+
+      .comparison-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .comparison-table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .comparison-table th,
+      .comparison-table td {
+        padding: 16px 18px;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .comparison-table th {
+        color: var(--text);
+        font-size: 0.95rem;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .comparison-table td {
+        color: var(--text-soft);
+        line-height: 1.6;
+      }
+
+      .comparison-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .audience-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .audience-card {
+        text-align: center;
+        min-height: 172px;
+        display: grid;
+        align-content: center;
+        gap: 8px;
+      }
+
+      .audience-card strong {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 1.45rem;
+        font-weight: 700;
+      }
+
+      .privacy-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+
+      .privacy-card {
+        min-height: 180px;
+      }
+
+      .privacy-card .icon {
+        font-size: 1.3rem;
+        color: var(--accent);
+        margin-bottom: 16px;
+      }
+
+      .beta-card {
+        margin-top: 22px;
+        padding: 28px;
+      }
+
+      .beta-card p {
+        margin: 0 0 20px;
+        font-size: 1.04rem;
+        line-height: 1.75;
+        color: var(--text-soft);
+        max-width: 760px;
+      }
+
+      .footer {
+        padding: 40px 0 60px;
+        color: var(--text-muted);
+      }
+
+      .footer-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        flex-wrap: wrap;
+        padding-top: 18px;
+        border-top: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .footer-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .footer-links a:hover {
+        color: var(--text);
+      }
+
+      @media (max-width: 1080px) {
+        .hero-layout,
+        .story-grid,
+        .progress-grid,
+        .comparison-grid,
+        .feature-grid,
+        .audience-grid,
+        .privacy-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .phone-shell {
+          width: 100%;
+          max-width: 420px;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .container {
+          width: min(var(--container), calc(100% - 24px));
+        }
+
+        .hero {
+          padding-top: 64px;
+        }
+
+        .nav {
+          padding: 14px 0;
+        }
+
+        .nav-links {
+          gap: 12px;
+        }
+
+        .hero h1 {
+          font-size: clamp(2.4rem, 14vw, 4rem);
+        }
+
+        .hero-copy {
+          font-size: 1.03rem;
+        }
+
+        .book-preview {
+          padding-left: 58px;
+        }
+
+        .notebook-card::after {
+          left: 36px;
+        }
+
+        .footer-row {
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container nav">
+        <a class="brand" href="#top">
+          <span class="brand-mark"><span>LF</span></span>
+          <span>LiftsForge</span>
+        </a>
+        <nav class="nav-links" aria-label="Primary">
+          <a href="#why">Why</a>
+          <a href="#book">Coaching Book</a>
+          <a href="#progress">Progress</a>
+          <a href="#privacy">Privacy</a>
+          <a class="button-secondary" href="#join-beta">Join Beta</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="container hero-layout">
+          <div>
+            <div class="eyebrow">It writes coaching books, not workout lists.</div>
+            <h1>LiftsForge</h1>
+            <p class="hero-copy">
+              <strong>AI strength coaching, forged from your training history.</strong>
+              Build personalized 12-week training blocks, understand every coaching
+              decision, and train with a coach that learns how you perform.
+            </p>
+            <div class="hero-rule"></div>
+            <ul class="hero-checks">
+              <li>Import years of training</li>
+              <li>Generate a 12-week coaching book</li>
+              <li>Understand every coaching decision</li>
+              <li>Log workouts in seconds</li>
+              <li>Review every training block</li>
+            </ul>
+            <div class="hero-actions">
+              <a class="button" href="#join-beta">Join Beta</a>
+              <a class="button-secondary" href="#why">Why LiftsForge exists</a>
+            </div>
+          </div>
+
+          <aside class="panel hero-panel" aria-label="Product philosophy">
+            <div class="quote-card">
+              <p>
+                Great athletes train with a plan.
+                <br />
+                Great coaches explain why.
+              </p>
+            </div>
+            <p class="hero-note">
+              Most fitness apps help you log workouts. Most AI tools generate
+              generic programs. Neither behaves like a coach. LiftsForge studies
+              your training history, creates long-term coaching books, explains
+              every decision, and adapts as you grow stronger.
+            </p>
+          </aside>
+        </div>
+      </section>
+
+      <section id="why">
+        <div class="container">
+          <div class="section-heading">
+            <span>Coaching, not prompting</span>
+            <h2>Your next block should feel written, not improvised.</h2>
+            <p>
+              Instead of asking a chatbot every week what to do, LiftsForge
+              studies your training history and writes a complete coaching book
+              for what comes next.
+            </p>
+          </div>
+
+          <div class="story-grid">
+            <div class="panel flow-card">
+              <div class="flow">
+                <div class="flow-step">
+                  <div class="step-index">1</div>
+                  <div>
+                    <strong>Import history</strong>
+                    <p>Bring in the work you have already done.</p>
+                  </div>
+                </div>
+                <div class="flow-step">
+                  <div class="step-index">2</div>
+                  <div>
+                    <strong>AI understands you</strong>
+                    <p>Patterns, progression, recovery, and response all become signal.</p>
+                  </div>
+                </div>
+                <div class="flow-step">
+                  <div class="step-index">3</div>
+                  <div>
+                    <strong>12-week coaching book</strong>
+                    <p>A full block with objective, weekly themes, and rationale.</p>
+                  </div>
+                </div>
+                <div class="flow-step">
+                  <div class="step-index">4</div>
+                  <div>
+                    <strong>Train, review, repeat</strong>
+                    <p>Every session teaches the coach how to write the next one better.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel phone-card">
+              <div class="phone-shell">
+                <div class="phone-screen">
+                  <div class="screen-label">Why every lift is here</div>
+                  <div class="screen-title">Bench Press</div>
+                  <div class="exercise-card">
+                    <pre>5 × 5</pre>
+                  </div>
+                  <div class="exercise-why">
+                    <pre>Why?
+
+Increasing horizontal pressing volume
+to prepare for heavier work in Week 8.
+
+Chosen because you respond better
+to moderate volume than high intensity.</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="book">
+        <div class="container">
+          <div class="section-heading">
+            <span>Every block starts with a book</span>
+            <h2>The plan is only part of the product.</h2>
+            <p>
+              LiftsForge does not hand you a pile of sessions and hope for the best.
+              It writes the objective, the themes, the phases, and the expected
+              outcome so your training feels connected from week one.
+            </p>
+          </div>
+
+          <div class="panel notebook-card">
+            <div class="book-preview">
+              <pre>12 Week Coaching Book
+
+Objective
+
+Increase absolute strength
+while maintaining recovery.
+
+Weekly themes
+
+Week 1  Movement quality
+Week 2  Volume
+Week 3  Intensity
+Week 4  Consolidation
+...
+
+Expected outcome
+
++5 kg squat
++2.5 kg bench</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="coach">
+        <div class="container">
+          <div class="section-heading">
+            <span>AI that coaches</span>
+            <h2>Before training. During training. After training.</h2>
+            <p>
+              The point is not to chat more. The point is to get the right coaching
+              at the right moment.
+            </p>
+          </div>
+
+          <div class="feature-grid">
+            <div class="panel feature-card">
+              <div class="feature-kicker">Before training</div>
+              <h3>Plans.</h3>
+              <p>
+                Creates the next 12 weeks from your history, goals, and the way
+                you actually respond to work.
+              </p>
+            </div>
+            <div class="panel feature-card">
+              <div class="feature-kicker">During training</div>
+              <h3>Explains.</h3>
+              <p>
+                Every exercise has a purpose. You are not left guessing why it is
+                there or what it prepares you for.
+              </p>
+            </div>
+            <div class="panel feature-card">
+              <div class="feature-kicker">After training</div>
+              <h3>Reflects.</h3>
+              <p>
+                Reviews the block, captures signal from the work you finished, and
+                helps shape the next phase.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="progress">
+        <div class="container">
+          <div class="section-heading">
+            <span>Built around long-term progress</span>
+            <h2>Most apps revolve around workouts. LiftsForge revolves around blocks.</h2>
+            <p>
+              Strength is a long game. The product should feel that way from the
+              first screen.
+            </p>
+          </div>
+
+          <div class="progress-grid">
+            <div class="panel comparison-card">
+              <div class="progress-card-title">Most apps</div>
+              <div class="progress-flow">
+                <pre>Workout
+
+↓
+
+Workout
+
+↓
+
+Workout
+
+↓
+
+Workout</pre>
+              </div>
+            </div>
+            <div class="panel comparison-card">
+              <div class="progress-card-title">LiftsForge</div>
+              <div class="progress-flow">
+                <pre>12 Week Block
+
+↓
+
+Review
+
+↓
+
+Next Block
+
+↓
+
+Years of progression</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="compare">
+        <div class="container">
+          <div class="section-heading">
+            <span>Not another workout tracker</span>
+            <h2>Logging matters. Understanding matters more.</h2>
+          </div>
+
+          <div class="panel comparison-card">
+            <table class="comparison-table">
+              <thead>
+                <tr>
+                  <th>Traditional app</th>
+                  <th>LiftsForge</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Log workouts</td>
+                  <td>Understand training</td>
+                </tr>
+                <tr>
+                  <td>Generic plans</td>
+                  <td>Personalized coaching</td>
+                </tr>
+                <tr>
+                  <td>Static programs</td>
+                  <td>Adaptive 12-week blocks</td>
+                </tr>
+                <tr>
+                  <td>Exercise database</td>
+                  <td>Coaching book</td>
+                </tr>
+                <tr>
+                  <td>Numbers</td>
+                  <td>Explanations</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="audience">
+        <div class="container">
+          <div class="section-heading">
+            <span>Built for serious lifters</span>
+            <h2>No gimmicks. No summer-body copy. No generic hype.</h2>
+          </div>
+
+          <div class="audience-grid">
+            <div class="panel audience-card">
+              <strong>Powerlifting</strong>
+              <p>Long-term strength work with intent.</p>
+            </div>
+            <div class="panel audience-card">
+              <strong>Strength</strong>
+              <p>For athletes who care how progress is built.</p>
+            </div>
+            <div class="panel audience-card">
+              <strong>Bodybuilding</strong>
+              <p>Structure, rationale, and progression that compounds over time.</p>
+            </div>
+            <div class="panel audience-card">
+              <strong>Hybrid athletes</strong>
+              <p>Coaching that balances performance demands, not buzzwords.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="privacy">
+        <div class="container">
+          <div class="section-heading">
+            <span>Your data stays yours</span>
+            <h2>Calm software for people who want to train, not perform for a feed.</h2>
+          </div>
+
+          <div class="privacy-grid">
+            <div class="panel privacy-card">
+              <div class="icon">↥</div>
+              <h3>Import your history</h3>
+              <p>Bring your old training into the system so the coaching starts with context.</p>
+            </div>
+            <div class="panel privacy-card">
+              <div class="icon">↧</div>
+              <h3>Export anytime</h3>
+              <p>Your work should be portable. Training history is not supposed to be trapped.</p>
+            </div>
+            <div class="panel privacy-card">
+              <div class="icon">◌</div>
+              <h3>Offline-first</h3>
+              <p>The app is built to stay useful even when your connection is not perfect.</p>
+            </div>
+            <div class="panel privacy-card">
+              <div class="icon">◎</div>
+              <h3>No social feed</h3>
+              <p>No vanity loop. No algorithmic pressure. Just your training and your coach.</p>
+            </div>
+            <div class="panel privacy-card">
+              <div class="icon">—</div>
+              <h3>No ads</h3>
+              <p>No clutter, no attention tax, and no design built around selling your focus away.</p>
+            </div>
+          </div>
+
+          <div id="join-beta" class="panel beta-card">
+            <div class="section-heading" style="margin-bottom: 14px">
+              <span>Join Beta</span>
+              <h2>Train with intent.</h2>
+            </div>
+            <p>
+              LiftsForge is being shaped carefully. Beta access is limited while
+              the coaching quality, review loop, and onboarding flow are refined.
+              If the philosophy resonates with you, this is the right time to get
+              close to the product.
+            </p>
+            <div class="hero-actions" style="margin-top: 0">
+              <a class="button" href="https://github.com/josefkarasek/ai-fitness-coach">Follow Development</a>
+              <a class="button-secondary" href="https://github.com/josefkarasek/ai-fitness-coach/issues">Request Access</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-row">
+        <div>
+          <div style="color: var(--text); font-weight: 700; margin-bottom: 8px">LiftsForge</div>
+          <div>Forged from your training history.</div>
+        </div>
+        <div class="footer-links">
+          <a href="#join-beta">Join Beta</a>
+          <a href="https://github.com/josefkarasek/ai-fitness-coach">GitHub</a>
+          <a href="#privacy">Privacy</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
