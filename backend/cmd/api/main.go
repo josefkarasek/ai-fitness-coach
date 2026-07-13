@@ -18,6 +18,7 @@ import (
 	httpMiddleware "github.com/josefkarasek/ai-fitness-coach/backend/internal/http/middleware"
 	httpRouter "github.com/josefkarasek/ai-fitness-coach/backend/internal/http/router"
 	"github.com/josefkarasek/ai-fitness-coach/backend/internal/storage/postgres"
+	"github.com/josefkarasek/ai-fitness-coach/backend/migrations"
 )
 
 func main() {
@@ -37,6 +38,11 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
+
+	if err := migrations.Apply(ctx, db); err != nil {
+		logger.Error("apply migrations", "error", err)
+		os.Exit(1)
+	}
 
 	healthHandler := httpHandlers.NewHealthHandler(db)
 	authHandler := httpHandlers.NewAuthHandler()

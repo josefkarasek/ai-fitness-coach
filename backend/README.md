@@ -32,10 +32,16 @@ Relevant environment variables:
 - `AUTH_MODE=disabled|firebase`
 - `FIREBASE_PROJECT_ID=<your-firebase-project-id>`
 - `GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/firebase-admin.json`
+- `FIREBASE_ADMIN_JSON=<full-firebase-service-account-json>`
 
 With the repository `Tiltfile`, auth now defaults to `firebase` when both
 `FIREBASE_PROJECT_ID` and `GOOGLE_APPLICATION_CREDENTIALS` are already set
 in your shell. Otherwise it falls back to `disabled`.
+
+For hosted environments like Railway, `FIREBASE_ADMIN_JSON` can be used
+instead of mounting a credentials file. When `GOOGLE_APPLICATION_CREDENTIALS`
+is not already set, the backend writes `FIREBASE_ADMIN_JSON` to a temporary
+runtime file and points the Firebase SDK at it automatically.
 
 When `AUTH_MODE=firebase`, the backend verifies Firebase ID tokens in middleware, upserts a backend `users` row, and exposes the authenticated backend user to handlers through request context.
 
@@ -58,6 +64,54 @@ Authorization: Bearer <firebase-id-token>
 
 - `GET /api/v1/health/live`
 - `GET /api/v1/health/ready`
+
+## Deploying to Railway
+
+This backend is ready to run on Railway with PostgreSQL and automatic schema
+migrations on boot.
+
+Recommended Railway service setup:
+
+1. Create a new Railway project.
+2. Add a PostgreSQL service to the project.
+3. Add a GitHub-backed service for this repository.
+4. In the backend service settings, set the root directory to `backend`.
+5. In the backend service settings, set the config file path to
+   `/backend/railway.toml`.
+6. Set `DATABASE_URL` in the backend service to the PostgreSQL service's
+   `DATABASE_URL` variable. Railway variable references use the service name as
+   the namespace, for example `\${{Postgres.DATABASE_URL}}`.
+
+Important backend variables:
+
+- `AUTH_MODE=disabled|firebase`
+- `FIREBASE_PROJECT_ID=<your-firebase-project-id>`
+- `GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/firebase-admin.json` if you mount
+  or inject a Firebase Admin credential file outside Git.
+- `FIREBASE_ADMIN_JSON=<full-firebase-service-account-json>` as the simplest
+  Railway-native way to provide Firebase Admin credentials
+- `AI_PROVIDER=mock|openai|disabled`
+- `AI_MODEL=<provider-specific-model-name>`
+- `AI_BASE_URL=<optional-provider-base-url>`
+- `AI_API_KEY=<provider-api-key>`
+
+Railway-specific notes:
+
+- Railway injects the runtime port, and this backend already reads `HTTP_PORT`.
+- The checked-in [`railway.toml`](/home/jkarasek/go/src/github.com/josefkarasek/ai-fitness-coach/backend/railway.toml)
+  configures Dockerfile builds plus a readiness healthcheck at
+  `/api/v1/health/ready`.
+- Railway PostgreSQL exposes `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`,
+  `PGDATABASE`, and `DATABASE_URL`; this backend only needs `DATABASE_URL`.
+
+Custom domain, DNS, and HTTPS:
+
+1. After the backend deploy is healthy, add a custom domain in Railway's domain
+   settings for the backend service.
+2. Create the DNS record Railway asks for, usually a `CNAME` for a subdomain.
+3. Once DNS is correct, Railway automatically provisions and renews a Let's
+   Encrypt certificate, so the domain becomes available over HTTPS without
+   extra app configuration.
 
 ## Training History Import
 

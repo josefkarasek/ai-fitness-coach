@@ -10,6 +10,7 @@ import (
 	"github.com/josefkarasek/ai-fitness-coach/backend/internal/config"
 	"github.com/josefkarasek/ai-fitness-coach/backend/internal/storage/postgres"
 	"github.com/josefkarasek/ai-fitness-coach/backend/internal/traininghistory"
+	"github.com/josefkarasek/ai-fitness-coach/backend/migrations"
 )
 
 func main() {
@@ -36,6 +37,11 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
+
+	if err := migrations.Apply(ctx, db); err != nil {
+		logger.Error("apply migrations", "error", err)
+		os.Exit(1)
+	}
 
 	file, err := os.Open(*csvPath)
 	if err != nil {

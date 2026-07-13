@@ -33,6 +33,7 @@ type Config struct {
 
 func Load() Config {
 	loadDotEnv()
+	prepareFirebaseCredentials()
 
 	return Config{
 		HTTPHost:                       getEnv("HTTP_HOST", defaultHTTPHost),
@@ -48,6 +49,37 @@ func Load() Config {
 		AIDailyWorkoutExplanationLimit: getIntEnv("AI_DAILY_WORKOUT_EXPLANATIONS_LIMIT", 3),
 		AIDailyWorkoutReviewLimit:      getIntEnv("AI_DAILY_WORKOUT_REVIEWS_LIMIT", 12),
 		AIDailyTrainingPlanLimit:       getIntEnv("AI_DAILY_TRAINING_PLANS_LIMIT", 3),
+	}
+}
+
+func prepareFirebaseCredentials() {
+	if strings.TrimSpace(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) != "" {
+		return
+	}
+
+	firebaseAdminJSON := strings.TrimSpace(os.Getenv("FIREBASE_ADMIN_JSON"))
+	if firebaseAdminJSON == "" {
+		return
+	}
+
+	file, err := os.CreateTemp("", "firebase-admin-*.json")
+	if err != nil {
+		slog.Warn("failed to create firebase credentials file", "error", err)
+		return
+	}
+	defer file.Close()
+
+	if _, err := file.WriteString(firebaseAdminJSON); err != nil {
+		slog.Warn("failed to write firebase credentials file", "path", file.Name(), "error", err)
+		return
+	}
+
+	if err := file.Chmod(0o600); err != nil {
+		slog.Warn("failed to chmod firebase credentials file", "path", file.Name(), "error", err)
+	}
+
+	if err := os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", file.Name()); err != nil {
+		slog.Warn("failed to export firebase credentials path", "path", file.Name(), "error", err)
 	}
 }
 
