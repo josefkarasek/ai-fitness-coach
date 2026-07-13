@@ -1,6 +1,11 @@
 name: Release Backend
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
   release:
     types: [published]
   workflow_dispatch:
