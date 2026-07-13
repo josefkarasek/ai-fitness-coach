@@ -7,13 +7,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//go:embed assets/landing.html assets/privacy.html assets/favicon.svg
+//go:embed assets/landing.html assets/privacy.html assets/deleteme.html assets/favicon.svg
 var landingPageFS embed.FS
 
 type LandingHandler struct {
-	html        []byte
-	privacyHTML []byte
-	favicon     []byte
+	html         []byte
+	privacyHTML  []byte
+	deleteMeHTML []byte
+	favicon      []byte
 }
 
 func NewLandingHandler() *LandingHandler {
@@ -27,15 +28,21 @@ func NewLandingHandler() *LandingHandler {
 		panic("read embedded privacy page: " + err.Error())
 	}
 
+	deleteMeHTML, err := landingPageFS.ReadFile("assets/deleteme.html")
+	if err != nil {
+		panic("read embedded delete-me page: " + err.Error())
+	}
+
 	favicon, err := landingPageFS.ReadFile("assets/favicon.svg")
 	if err != nil {
 		panic("read embedded favicon: " + err.Error())
 	}
 
 	return &LandingHandler{
-		html:        html,
-		privacyHTML: privacyHTML,
-		favicon:     favicon,
+		html:         html,
+		privacyHTML:  privacyHTML,
+		deleteMeHTML: deleteMeHTML,
+		favicon:      favicon,
 	}
 }
 
@@ -45,6 +52,10 @@ func (h *LandingHandler) Home(c *gin.Context) {
 
 func (h *LandingHandler) Privacy(c *gin.Context) {
 	c.Data(http.StatusOK, "text/html; charset=utf-8", h.privacyHTML)
+}
+
+func (h *LandingHandler) DeleteMe(c *gin.Context) {
+	c.Data(http.StatusOK, "text/html; charset=utf-8", h.deleteMeHTML)
 }
 
 func (h *LandingHandler) Favicon(c *gin.Context) {

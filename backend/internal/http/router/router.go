@@ -24,6 +24,7 @@ func New(
 	if landingHandler != nil {
 		r.GET("/", landingHandler.Home)
 		r.GET("/privacy", landingHandler.Privacy)
+		r.GET("/deleteme", landingHandler.DeleteMe)
 		r.GET("/favicon.svg", landingHandler.Favicon)
 	}
 
