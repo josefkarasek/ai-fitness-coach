@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/app_backend.dart';
 import '../settings/app_preferences.dart';
 import '../storage/local/local_cache_repository.dart';
 
@@ -23,7 +24,7 @@ const Color _textSecondary = Color(0xFFB1BBC8);
 const Color _textMuted = Color(0xFF808B98);
 const Color _accentGreen = Color(0xFF42D392);
 const Color _accentBlue = Color(0xFF5EA4FF);
-const String _backendBaseUrl = 'https://liftsforge.com';
+const Duration _backendRequestTimeout = Duration(seconds: 20);
 const List<String> _storedSessionFeelLabels = <String>[
   'Easy',
   'Good',
@@ -68,28 +69,28 @@ class _HomeScreenState extends State<HomeScreen>
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _promoCodeController = TextEditingController();
   final TextEditingController _meUrlController = TextEditingController(
-    text: '$_backendBaseUrl/api/v1/me',
+    text: AppBackend.me().toString(),
   );
   final TextEditingController _promoCodesRedeemUrlController =
       TextEditingController(
-    text: '$_backendBaseUrl/api/v1/promo-codes/redeem',
+    text: AppBackend.redeemPromoCode().toString(),
   );
   final TextEditingController _importsUrlController = TextEditingController(
-    text: '$_backendBaseUrl/api/v1/imports',
+    text: AppBackend.imports().toString(),
   );
   final TextEditingController _workoutsUrlController = TextEditingController(
-    text: '$_backendBaseUrl/api/v1/workouts',
+    text: AppBackend.workouts().toString(),
   );
   final TextEditingController _workoutLogsUrlController = TextEditingController(
-    text: '$_backendBaseUrl/api/v1/workout-logs',
+    text: AppBackend.workoutLogs().toString(),
   );
   final TextEditingController _trainingPlansUrlController =
       TextEditingController(
-    text: '$_backendBaseUrl/api/v1/training-plans',
+    text: AppBackend.trainingPlans().toString(),
   );
   final TextEditingController _trainingPlansLatestUrlController =
       TextEditingController(
-    text: '$_backendBaseUrl/api/v1/training-plans/latest',
+    text: AppBackend.latestTrainingPlan().toString(),
   );
   final TextEditingController _planObjectiveController = TextEditingController(
     text: 'Build a 12-week strength block',
@@ -140,6 +141,8 @@ class _HomeScreenState extends State<HomeScreen>
   int? _activeDisplayedWeekPlanID;
   double _weekStripDragDistance = 0;
   double _weekStripOffset = 0;
+  String? _lastResumePromptedDraftKey;
+  bool _resumePromptVisible = false;
   late final AnimationController _weekStripAnimationController;
   Animation<double>? _weekStripOffsetAnimation;
   StreamSubscription<User?>? _authStateSubscription;
@@ -215,6 +218,8 @@ class _HomeScreenState extends State<HomeScreen>
         _activeDisplayedWeekNumber = null;
         _activeDisplayedWeekPlanID = null;
         _weekStripOffset = 0;
+        _lastResumePromptedDraftKey = null;
+        _resumePromptVisible = false;
       });
       return;
     }
@@ -235,6 +240,7 @@ class _HomeScreenState extends State<HomeScreen>
       _loadingAppState = false;
       _showPlanBuilder = _latestTrainingPlan == null;
     });
+    _maybePromptToResumeWorkout();
   }
 
   Future<void> _hydrateLatestTrainingPlanForSignedInUser() async {
@@ -242,11 +248,14 @@ class _HomeScreenState extends State<HomeScreen>
       final String token = await _requireIdToken();
       await _loadBackendUserProfile(token, announceStatus: false);
       final Uri uri = Uri.parse(_trainingPlansLatestUrlController.text.trim());
-      final http.Response response = await http.get(
-        uri,
-        headers: <String, String>{
-          HttpHeaders.authorizationHeader: 'Bearer $token',
-        },
+      final http.Response response = await _performRequest(
+        () => http.get(
+          uri,
+          headers: <String, String>{
+            HttpHeaders.authorizationHeader: 'Bearer $token',
+          },
+        ),
+        action: 'restore your latest training block',
       );
 
       final String body = response.body;
@@ -299,6 +308,8 @@ class _HomeScreenState extends State<HomeScreen>
       await _syncDisplayedWeekForCurrentPlan();
       await _maybeLoadWeeklyCoachingPreview(token, plan);
     } on _UiException {
+      // Signed-in hydration should fail quietly and let the UI recover.
+    } on _BackendConnectivityException {
       // Signed-in hydration should fail quietly and let the UI recover.
     } catch (_) {
       _setStatus('Could not restore your latest coaching state.');
@@ -500,7 +511,6 @@ class _HomeScreenState extends State<HomeScreen>
             : null;
     final _WeekdayWorkoutSlot? selectedWeekSlot =
         _selectedWeekSlot(currentWeekSlots);
-
     return Scaffold(
       body: DecoratedBox(
         decoration: const BoxDecoration(
@@ -639,40 +649,47 @@ class _HomeScreenState extends State<HomeScreen>
                     },
                   ),
                 ),
-                if (selectedWeekSlot != null &&
-                    (selectedWeekSlot.hasWorkout ||
-                        selectedWeekSlot.loggedWorkout != null)) ...<Widget>[
+                if (plan != null &&
+                    selectedWeekSlot != null &&
+                    (selectedWeekSlot.loggedWorkout != null ||
+                        selectedWeekSlot.draftSummary != null ||
+                        selectedWeekSlot.workout != null ||
+                        selectedWeekSlot.isCurrentDay)) ...<Widget>[
                   const SizedBox(height: 12),
-                  _WorkoutDayDetailCard(
-                    currentWeekNumber: displayedWeekNumber,
-                    totalWeeks: plan?.durationWeeks ?? 12,
+                  _SelectedDayWorkoutCard(
                     slot: selectedWeekSlot,
-                    onStart: selectedWeekSlot.workout == null || plan == null
+                    weekNumber: displayedWeekNumber,
+                    currentWeekNumber: currentWeekNumber,
+                    upcomingWorkout: upcomingWorkout,
+                    onOpenLoggedWorkout: selectedWeekSlot.loggedWorkout == null
+                        ? null
+                        : () => _showWorkoutReviewScreen(
+                              context,
+                              plan,
+                              selectedWeekSlot.loggedWorkout!,
+                            ),
+                    onResumeDraft: selectedWeekSlot.draftSummary == null ||
+                            selectedWeekSlot.workout == null
                         ? null
                         : () => _showWorkoutPreview(
                               context,
                               plan,
-                              _UpcomingWorkoutData(
-                                relativeLabel: selectedWeekSlot.isCurrentDay
-                                    ? 'Today'
-                                    : 'Scheduled',
-                                weekNumber: displayedWeekNumber,
-                                dayNumber: selectedWeekSlot.workout!.dayNumber,
-                                title: selectedWeekSlot.workout!.title,
-                                focus: selectedWeekSlot.workout!.focus,
-                                plannedExercises:
-                                    selectedWeekSlot.workout!.exercises,
+                              _upcomingWorkoutDataFromSlot(
+                                selectedWeekSlot,
+                                displayedWeekNumber,
+                              ),
+                            ),
+                    onPreviewWorkout: selectedWeekSlot.workout == null
+                        ? null
+                        : () => _showWorkoutPreview(
+                              context,
+                              plan,
+                              _upcomingWorkoutDataFromSlot(
+                                selectedWeekSlot,
+                                displayedWeekNumber,
                               ),
                               existingLog: selectedWeekSlot.loggedWorkout,
                             ),
-                    onReview:
-                        selectedWeekSlot.loggedWorkout == null || plan == null
-                            ? null
-                            : () => _showWorkoutReviewScreen(
-                                  context,
-                                  plan,
-                                  selectedWeekSlot.loggedWorkout!,
-                                ),
                   ),
                 ],
                 if (plan != null &&
@@ -1344,6 +1361,21 @@ class _HomeScreenState extends State<HomeScreen>
     return slots.first;
   }
 
+  _UpcomingWorkoutData _upcomingWorkoutDataFromSlot(
+    _WeekdayWorkoutSlot slot,
+    int weekNumber,
+  ) {
+    final _TrainingPlanWorkout workout = slot.workout!;
+    return _UpcomingWorkoutData(
+      relativeLabel: slot.isCurrentDay ? 'Today' : 'Scheduled',
+      weekNumber: weekNumber,
+      dayNumber: workout.dayNumber,
+      title: workout.title,
+      focus: workout.focus,
+      plannedExercises: workout.exercises,
+    );
+  }
+
   _UpcomingWorkoutData? _upcomingWorkout(
     _TrainingPlanResult? plan,
     List<_WorkoutLogItem> workoutLogs,
@@ -1391,6 +1423,143 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     return null;
+  }
+
+  _ResumableWorkoutContext? _resumableWorkoutContext(
+    _TrainingPlanResult? plan,
+  ) {
+    if (plan == null || _workoutSessionDraftsByKey.isEmpty) {
+      return null;
+    }
+
+    final List<_WorkoutSessionDraftSummary> orderedDrafts =
+        _workoutSessionDraftsByKey.values.toList()
+          ..sort(
+            (
+              _WorkoutSessionDraftSummary a,
+              _WorkoutSessionDraftSummary b,
+            ) =>
+                b.updatedAt.compareTo(a.updatedAt),
+          );
+
+    for (final _WorkoutSessionDraftSummary draft in orderedDrafts) {
+      if (draft.trainingPlanID != plan.planID) {
+        continue;
+      }
+
+      _WorkoutLogItem? existingLog;
+      for (final _WorkoutLogItem item in _workoutLogs) {
+        if (item.trainingPlanID == draft.trainingPlanID &&
+            item.weekNumber == draft.weekNumber &&
+            item.dayNumber == draft.dayNumber) {
+          existingLog = item;
+          break;
+        }
+      }
+      if (existingLog != null) {
+        continue;
+      }
+
+      final _TrainingPlanWorkout? workout =
+          plan.findWorkout(draft.weekNumber, draft.dayNumber);
+      if (workout == null) {
+        continue;
+      }
+
+      return _ResumableWorkoutContext(
+        draft: draft,
+        workout: _UpcomingWorkoutData(
+          relativeLabel: draft.weekNumber ==
+                  _currentWeekNumber(plan, _workoutLogsForPlan(plan.planID))
+              ? (draft.dayNumber == DateTime.now().weekday ? 'Today' : 'Saved')
+              : 'Saved',
+          weekNumber: draft.weekNumber,
+          dayNumber: draft.dayNumber,
+          title: workout.title,
+          focus: workout.focus,
+          plannedExercises: workout.exercises,
+        ),
+      );
+    }
+
+    return null;
+  }
+
+  Future<void> _maybePromptToResumeWorkout() async {
+    if (!mounted || _resumePromptVisible) {
+      return;
+    }
+
+    final _TrainingPlanResult? plan = _latestTrainingPlan;
+    final _ResumableWorkoutContext? resumable = _resumableWorkoutContext(plan);
+    if (plan == null || resumable == null) {
+      return;
+    }
+
+    final String draftKey = _workoutSessionDraftKey(
+      trainingPlanID: resumable.draft.trainingPlanID,
+      weekNumber: resumable.draft.weekNumber,
+      dayNumber: resumable.draft.dayNumber,
+    );
+    if (_lastResumePromptedDraftKey == draftKey) {
+      return;
+    }
+
+    _resumePromptVisible = true;
+    _lastResumePromptedDraftKey = draftKey;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _resumePromptVisible = false;
+        return;
+      }
+
+      final bool? shouldResume = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: _surface,
+            title: const Text(
+              'Resume workout?',
+              style: TextStyle(color: _textPrimary),
+            ),
+            content: Text(
+              'You have an in-progress ${resumable.workout.title} session saved on this device. Do you want to jump back in?',
+              style: const TextStyle(
+                color: _textSecondary,
+                height: 1.5,
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Later'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Resume'),
+              ),
+            ],
+          );
+        },
+      );
+
+      _resumePromptVisible = false;
+      if (!mounted || shouldResume != true) {
+        return;
+      }
+
+      setState(() {
+        _selectedWeekday = _weekdayOptions[
+            resumable.workout.dayNumber.clamp(1, _weekdayOptions.length) - 1];
+        _viewedWeekNumber = resumable.workout.weekNumber;
+      });
+      await _showWorkoutPreview(
+        context,
+        plan,
+        resumable.workout,
+      );
+    });
   }
 
   bool _usesDirectWeekdayMapping(
@@ -1784,7 +1953,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   _ParsedSessionFeedback _parseStoredSessionFeedback(String raw) {
     final RegExp prefixedPattern = RegExp(
-      r'^Session feel:\s*(Easy|Good|Hard|Brutal)\.?(?:\s*Coach note:\s*(.*))?$',
+      r'^Session feel:\s*(Easy|Good|Hard|Brutal)\.?(?:\s*Athlete note:\s*(.*))?$',
       caseSensitive: false,
       dotAll: true,
     );
@@ -1919,22 +2088,26 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _redeemPromoCode(String token, String promoCode) async {
     final Uri uri = Uri.parse(_promoCodesRedeemUrlController.text.trim());
-    final http.Response response = await http.post(
-      uri,
-      headers: <String, String>{
-        HttpHeaders.authorizationHeader: 'Bearer $token',
-        HttpHeaders.contentTypeHeader: 'application/json',
-      },
-      body: jsonEncode(<String, String>{'code': promoCode}),
+    final http.Response response = await _performRequest(
+      () => http.post(
+        uri,
+        headers: <String, String>{
+          HttpHeaders.authorizationHeader: 'Bearer $token',
+          HttpHeaders.contentTypeHeader: 'application/json',
+        },
+        body: jsonEncode(<String, String>{'code': promoCode}),
+      ),
+      action: 'redeem the promo code',
     );
 
     if (response.statusCode == HttpStatus.notFound) {
       throw const _UiException('Promo code not found.');
     }
     if (response.statusCode >= 400) {
-      throw _UiException(
-        'Promo code redemption failed with HTTP ${response.statusCode}.',
-      );
+      throw _UiException(_formatBackendFailure(
+        action: 'redeem the promo code',
+        response: response,
+      ));
     }
 
     final Object? decoded = jsonDecode(response.body);
@@ -2020,11 +2193,14 @@ class _HomeScreenState extends State<HomeScreen>
     await _runBusyAction(() async {
       final String token = await _requireIdToken();
       final Uri uri = Uri.parse(_workoutsUrlController.text.trim());
-      final http.Response response = await http.get(
-        uri,
-        headers: <String, String>{
-          HttpHeaders.authorizationHeader: 'Bearer $token',
-        },
+      final http.Response response = await _performRequest(
+        () => http.get(
+          uri,
+          headers: <String, String>{
+            HttpHeaders.authorizationHeader: 'Bearer $token',
+          },
+        ),
+        action: 'load workout history',
       );
 
       final String body = response.body;
@@ -2163,29 +2339,33 @@ class _HomeScreenState extends State<HomeScreen>
             int.tryParse(_planDaysPerWeekController.text.trim()) ?? 0;
 
         final Uri uri = Uri.parse(_trainingPlansUrlController.text.trim());
-        final http.Response response = await http.post(
-          uri,
-          headers: <String, String>{
-            HttpHeaders.authorizationHeader: 'Bearer $token',
-            HttpHeaders.contentTypeHeader: 'application/json',
-          },
-          body: jsonEncode(<String, Object>{
-            'objective': _planObjectiveController.text.trim(),
-            'duration_weeks': durationWeeks,
-            'days_per_week': daysPerWeek,
-            'measurement_system': _deviceMeasurementSystem,
-            'constraints': _planConstraintsController.text.trim(),
-            'equipment': _planEquipmentController.text.trim(),
-            'notes': _planNotesController.text.trim(),
-            'profile': <String, Object>{
-              'display_name': _backendUser?.displayName.isNotEmpty == true
-                  ? _backendUser!.displayName
-                  : (_auth.currentUser?.displayName ?? ''),
-              'training_experience': _backendUser?.trainingExperience ?? '',
-              'primary_goal': _backendUser?.primaryGoal ?? '',
-              'preferred_days': _backendUser?.preferredDays ?? const <String>[],
+        final http.Response response = await _performRequest(
+          () => http.post(
+            uri,
+            headers: <String, String>{
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+              HttpHeaders.contentTypeHeader: 'application/json',
             },
-          }),
+            body: jsonEncode(<String, Object>{
+              'objective': _planObjectiveController.text.trim(),
+              'duration_weeks': durationWeeks,
+              'days_per_week': daysPerWeek,
+              'measurement_system': _deviceMeasurementSystem,
+              'constraints': _planConstraintsController.text.trim(),
+              'equipment': _planEquipmentController.text.trim(),
+              'notes': _planNotesController.text.trim(),
+              'profile': <String, Object>{
+                'display_name': _backendUser?.displayName.isNotEmpty == true
+                    ? _backendUser!.displayName
+                    : (_auth.currentUser?.displayName ?? ''),
+                'training_experience': _backendUser?.trainingExperience ?? '',
+                'primary_goal': _backendUser?.primaryGoal ?? '',
+                'preferred_days':
+                    _backendUser?.preferredDays ?? const <String>[],
+              },
+            }),
+          ),
+          action: 'generate the training plan',
         );
 
         final String body = response.body;
@@ -2202,9 +2382,10 @@ class _HomeScreenState extends State<HomeScreen>
         }
 
         if (response.statusCode >= 400) {
-          throw _UiException(
-            'Training plan request failed with HTTP ${response.statusCode}.',
-          );
+          throw _UiException(_formatBackendFailure(
+            action: 'generate the training plan',
+            response: response,
+          ));
         }
 
         final _TrainingPlanResult? plan = _parseTrainingPlanFromResponse(body);
@@ -2499,13 +2680,16 @@ class _HomeScreenState extends State<HomeScreen>
       final Uri uri = Uri.parse(
         '${_trainingPlansUrlController.text.trim()}/$planID/$actionPath',
       );
-      final http.Response response = await http.post(
-        uri,
-        headers: <String, String>{
-          HttpHeaders.authorizationHeader: 'Bearer $token',
-          HttpHeaders.contentTypeHeader: 'application/json',
-        },
-        body: jsonEncode(payload),
+      final http.Response response = await _performRequest(
+        () => http.post(
+          uri,
+          headers: <String, String>{
+            HttpHeaders.authorizationHeader: 'Bearer $token',
+            HttpHeaders.contentTypeHeader: 'application/json',
+          },
+          body: jsonEncode(payload),
+        ),
+        action: 'update the training plan',
       );
 
       final String body = response.body;
@@ -2515,9 +2699,10 @@ class _HomeScreenState extends State<HomeScreen>
       });
 
       if (!expectedStatusCodes.contains(response.statusCode)) {
-        throw _UiException(
-          'Training plan update failed with HTTP ${response.statusCode}.',
-        );
+        throw _UiException(_formatBackendFailure(
+          action: 'update the training plan',
+          response: response,
+        ));
       }
 
       final _TrainingPlanResult? plan = _parseTrainingPlanFromResponse(body);
@@ -2576,7 +2761,10 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
 
-    final http.StreamedResponse response = await request.send();
+    final http.StreamedResponse response = await _performStreamedRequest(
+      () => request.send(),
+      action: 'import past training',
+    );
     final String body = await response.stream.bytesToString();
 
     setState(() {
@@ -2586,17 +2774,27 @@ class _HomeScreenState extends State<HomeScreen>
     if (announceStatus) {
       _setStatus('Training import request completed.');
     }
+    if (response.statusCode >= 400) {
+      throw _UiException(_formatBackendFailure(
+        action: 'import past training',
+        statusCode: response.statusCode,
+        responseBody: body,
+      ));
+    }
   }
 
   Future<void> _loadLatestTrainingPlan() async {
     await _runBusyAction(() async {
       final String token = await _requireIdToken();
       final Uri uri = Uri.parse(_trainingPlansLatestUrlController.text.trim());
-      final http.Response response = await http.get(
-        uri,
-        headers: <String, String>{
-          HttpHeaders.authorizationHeader: 'Bearer $token',
-        },
+      final http.Response response = await _performRequest(
+        () => http.get(
+          uri,
+          headers: <String, String>{
+            HttpHeaders.authorizationHeader: 'Bearer $token',
+          },
+        ),
+        action: 'load the latest training plan',
       );
 
       final String body = response.body;
@@ -2606,9 +2804,10 @@ class _HomeScreenState extends State<HomeScreen>
       });
 
       if (response.statusCode >= 400) {
-        throw _UiException(
-          'Load latest training plan failed with HTTP ${response.statusCode}.',
-        );
+        throw _UiException(_formatBackendFailure(
+          action: 'load the latest training plan',
+          response: response,
+        ));
       }
 
       final _TrainingPlanResult? plan = _parseTrainingPlanFromResponse(body);
@@ -2646,13 +2845,16 @@ class _HomeScreenState extends State<HomeScreen>
       final String token = await _requireIdToken();
       final Uri uri = Uri.parse(_workoutLogsUrlController.text.trim());
       try {
-        final http.Response response = await http.post(
-          uri,
-          headers: <String, String>{
-            HttpHeaders.authorizationHeader: 'Bearer $token',
-            HttpHeaders.contentTypeHeader: 'application/json',
-          },
-          body: jsonEncode(draft.toJson()),
+        final http.Response response = await _performRequest(
+          () => http.post(
+            uri,
+            headers: <String, String>{
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+              HttpHeaders.contentTypeHeader: 'application/json',
+            },
+            body: jsonEncode(draft.toJson()),
+          ),
+          action: 'save the workout log',
         );
 
         final String body = response.body;
@@ -2662,9 +2864,10 @@ class _HomeScreenState extends State<HomeScreen>
         });
 
         if (response.statusCode >= 400) {
-          throw _UiException(
-            'Workout log request failed with HTTP ${response.statusCode}.',
-          );
+          throw _UiException(_formatBackendFailure(
+            action: 'save the workout log',
+            response: response,
+          ));
         }
 
         final _WorkoutLogItem? savedLog = _parseWorkoutLogFromResponse(body);
@@ -2712,21 +2915,7 @@ class _HomeScreenState extends State<HomeScreen>
         }
         result = savedLog;
         _setStatus('Workout log saved.');
-      } on SocketException catch (_) {
-        await _queueWorkoutLogForSync(currentUser.uid, draft);
-        await widget.localCacheRepository.clearWorkoutSessionDraft(
-          firebaseUid: currentUser.uid,
-          trainingPlanId: draft.trainingPlanID,
-          weekNumber: draft.weekNumber,
-          dayNumber: draft.dayNumber,
-        );
-        _removeWorkoutSessionDraftFromState(
-          trainingPlanID: draft.trainingPlanID,
-          weekNumber: draft.weekNumber,
-          dayNumber: draft.dayNumber,
-        );
-        result = _workoutLogItemFromDraft(draft);
-      } on http.ClientException catch (_) {
+      } on _BackendConnectivityException {
         await _queueWorkoutLogForSync(currentUser.uid, draft);
         await widget.localCacheRepository.clearWorkoutSessionDraft(
           firebaseUid: currentUser.uid,
@@ -2758,11 +2947,14 @@ class _HomeScreenState extends State<HomeScreen>
         'limit': '100',
       },
     );
-    final http.Response response = await http.get(
-      uri,
-      headers: <String, String>{
-        HttpHeaders.authorizationHeader: 'Bearer $token',
-      },
+    final http.Response response = await _performRequest(
+      () => http.get(
+        uri,
+        headers: <String, String>{
+          HttpHeaders.authorizationHeader: 'Bearer $token',
+        },
+      ),
+      action: 'load workout logs',
     );
 
     final String body = response.body;
@@ -2772,9 +2964,10 @@ class _HomeScreenState extends State<HomeScreen>
     });
 
     if (response.statusCode >= 400) {
-      throw _UiException(
-        'Load workout logs failed with HTTP ${response.statusCode}.',
-      );
+      throw _UiException(_formatBackendFailure(
+        action: 'load workout logs',
+        response: response,
+      ));
     }
 
     final List<_WorkoutLogItem> logs = _parseWorkoutLogsFromResponse(body);
@@ -2886,15 +3079,18 @@ class _HomeScreenState extends State<HomeScreen>
     final Uri uri = Uri.parse(
       '${_trainingPlansUrlController.text.trim()}/${plan.planID}/weekly-preview',
     );
-    final http.Response response = await http.post(
-      uri,
-      headers: <String, String>{
-        HttpHeaders.authorizationHeader: 'Bearer $token',
-        HttpHeaders.contentTypeHeader: 'application/json',
-      },
-      body: jsonEncode(<String, int>{
-        'current_week': currentWeekNumber,
-      }),
+    final http.Response response = await _performRequest(
+      () => http.post(
+        uri,
+        headers: <String, String>{
+          HttpHeaders.authorizationHeader: 'Bearer $token',
+          HttpHeaders.contentTypeHeader: 'application/json',
+        },
+        body: jsonEncode(<String, int>{
+          'current_week': currentWeekNumber,
+        }),
+      ),
+      action: 'generate the weekly briefing',
     );
 
     if (response.statusCode >= 400) {
@@ -2945,11 +3141,14 @@ class _HomeScreenState extends State<HomeScreen>
     await _runBusyAction(() async {
       final String token = await _requireIdToken();
       final Uri uri = _buildWorkoutExplanationUri(workout.id);
-      final http.Response response = await http.post(
-        uri,
-        headers: <String, String>{
-          HttpHeaders.authorizationHeader: 'Bearer $token',
-        },
+      final http.Response response = await _performRequest(
+        () => http.post(
+          uri,
+          headers: <String, String>{
+            HttpHeaders.authorizationHeader: 'Bearer $token',
+          },
+        ),
+        action: 'generate the workout explanation',
       );
 
       final String body = response.body;
@@ -2959,9 +3158,10 @@ class _HomeScreenState extends State<HomeScreen>
       });
 
       if (response.statusCode >= 400) {
-        throw _UiException(
-          'Workout explanation request failed with HTTP ${response.statusCode}.',
-        );
+        throw _UiException(_formatBackendFailure(
+          action: 'generate the workout explanation',
+          response: response,
+        ));
       }
 
       final _WorkoutExplanationResult? explanation =
@@ -3040,11 +3240,13 @@ class _HomeScreenState extends State<HomeScreen>
     try {
       await action();
     } on FirebaseAuthException catch (error) {
-      _setStatus('Firebase Auth error: ${error.code}');
+      _setStatus(_friendlyFirebaseAuthError(error));
+    } on _BackendConnectivityException catch (error) {
+      _setStatus(error.message);
     } on _UiException catch (error) {
       _setStatus(error.message);
     } catch (error) {
-      _setStatus('Unexpected error: $error');
+      _setStatus('Something unexpected went wrong. Please try again.');
     } finally {
       if (mounted) {
         setState(() {
@@ -3063,6 +3265,143 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() {
       _status = message;
     });
+  }
+
+  Future<http.Response> _performRequest(
+    Future<http.Response> Function() request, {
+    required String action,
+  }) async {
+    try {
+      return await request().timeout(_backendRequestTimeout);
+    } on SocketException {
+      throw _BackendConnectivityException(
+        'Could not $action because the backend is unreachable. Check your internet connection and try again.',
+      );
+    } on TimeoutException {
+      throw _BackendConnectivityException(
+        'Could not $action because the backend took too long to respond.',
+      );
+    } on http.ClientException {
+      throw _BackendConnectivityException(
+        'Could not $action because the app could not reach the backend cleanly.',
+      );
+    }
+  }
+
+  Future<http.StreamedResponse> _performStreamedRequest(
+    Future<http.StreamedResponse> Function() request, {
+    required String action,
+  }) async {
+    try {
+      return await request().timeout(_backendRequestTimeout);
+    } on SocketException {
+      throw _BackendConnectivityException(
+        'Could not $action because the backend is unreachable. Check your internet connection and try again.',
+      );
+    } on TimeoutException {
+      throw _BackendConnectivityException(
+        'Could not $action because the backend took too long to respond.',
+      );
+    } on http.ClientException {
+      throw _BackendConnectivityException(
+        'Could not $action because the app could not reach the backend cleanly.',
+      );
+    }
+  }
+
+  String _formatBackendFailure({
+    required String action,
+    http.Response? response,
+    int? statusCode,
+    String? responseBody,
+  }) {
+    final int code = statusCode ?? response?.statusCode ?? 0;
+    final String body = responseBody ?? response?.body ?? '';
+    final String? backendError = _extractBackendErrorMessage(body);
+
+    switch (code) {
+      case HttpStatus.badRequest:
+        return backendError == null
+            ? 'Could not $action because the request was invalid.'
+            : 'Could not $action. $backendError';
+      case HttpStatus.unauthorized:
+        return 'Your sign-in session expired. Please sign in again and retry.';
+      case HttpStatus.forbidden:
+        return backendError == null
+            ? 'You are not allowed to $action.'
+            : 'Could not $action. $backendError';
+      case HttpStatus.notFound:
+        return backendError == null
+            ? 'Could not $action because the requested resource was not found.'
+            : 'Could not $action. $backendError';
+      case HttpStatus.conflict:
+        return backendError == null
+            ? 'Could not $action because the backend rejected the current state.'
+            : 'Could not $action. $backendError';
+      case HttpStatus.tooManyRequests:
+        return backendError == null
+            ? 'Could not $action because the backend is rate-limiting requests right now.'
+            : 'Could not $action. $backendError';
+      default:
+        if (code >= 500) {
+          return backendError == null
+              ? 'Could not $action because the backend hit an internal error.'
+              : 'Could not $action. $backendError';
+        }
+        return backendError == null
+            ? 'Could not $action (HTTP $code).'
+            : 'Could not $action. $backendError';
+    }
+  }
+
+  String? _extractBackendErrorMessage(String body) {
+    final String trimmed = body.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+
+    try {
+      final Object? decoded = jsonDecode(trimmed);
+      if (decoded is Map<String, dynamic>) {
+        final Object? error = decoded['error'];
+        if (error is String && error.trim().isNotEmpty) {
+          return error.trim();
+        }
+        final Object? message = decoded['message'];
+        if (message is String && message.trim().isNotEmpty) {
+          return message.trim();
+        }
+      }
+    } catch (_) {
+      // Fall through to raw body handling.
+    }
+
+    if (trimmed.length <= 180) {
+      return trimmed;
+    }
+
+    return null;
+  }
+
+  String _friendlyFirebaseAuthError(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'invalid-email':
+        return 'That email address does not look valid.';
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Email or password is incorrect.';
+      case 'email-already-in-use':
+        return 'An account with this email already exists.';
+      case 'weak-password':
+        return 'Choose a stronger password.';
+      case 'too-many-requests':
+        return 'Firebase is temporarily rate-limiting sign-in attempts. Try again shortly.';
+      case 'network-request-failed':
+        return 'Could not reach Firebase. Check your internet connection and try again.';
+      default:
+        return 'Authentication failed. Please try again.';
+    }
   }
 
   void _showToast(String message) {
@@ -3987,11 +4326,14 @@ class _HomeScreenState extends State<HomeScreen>
     bool announceStatus = true,
   }) async {
     final Uri uri = Uri.parse(_meUrlController.text.trim());
-    final http.Response response = await http.get(
-      uri,
-      headers: <String, String>{
-        HttpHeaders.authorizationHeader: 'Bearer $token',
-      },
+    final http.Response response = await _performRequest(
+      () => http.get(
+        uri,
+        headers: <String, String>{
+          HttpHeaders.authorizationHeader: 'Bearer $token',
+        },
+      ),
+      action: 'load your profile',
     );
 
     final String body = response.body;
@@ -4001,9 +4343,10 @@ class _HomeScreenState extends State<HomeScreen>
     });
 
     if (response.statusCode >= 400) {
-      throw _UiException(
-        'Backend identity check failed with HTTP ${response.statusCode}.',
-      );
+      throw _UiException(_formatBackendFailure(
+        action: 'load your profile',
+        response: response,
+      ));
     }
 
     final _BackendUserProfile? profile = _parseBackendUserProfile(body);
@@ -4508,20 +4851,292 @@ class _WeekdayCircle extends StatelessWidget {
   }
 }
 
-class _WorkoutDayDetailCard extends StatelessWidget {
-  const _WorkoutDayDetailCard({
-    required this.currentWeekNumber,
-    required this.totalWeeks,
+class _SelectedDayWorkoutCard extends StatelessWidget {
+  const _SelectedDayWorkoutCard({
     required this.slot,
-    this.onStart,
-    this.onReview,
+    required this.weekNumber,
+    required this.currentWeekNumber,
+    required this.upcomingWorkout,
+    this.onOpenLoggedWorkout,
+    this.onResumeDraft,
+    this.onPreviewWorkout,
   });
 
-  final int currentWeekNumber;
-  final int totalWeeks;
   final _WeekdayWorkoutSlot slot;
-  final VoidCallback? onStart;
-  final VoidCallback? onReview;
+  final int weekNumber;
+  final int currentWeekNumber;
+  final _UpcomingWorkoutData? upcomingWorkout;
+  final VoidCallback? onOpenLoggedWorkout;
+  final VoidCallback? onResumeDraft;
+  final VoidCallback? onPreviewWorkout;
+
+  @override
+  Widget build(BuildContext context) {
+    String eyebrow = slot.isCurrentDay ? 'Today' : 'Selected Day';
+    String title = slot.weekdayLabel;
+    String body =
+        'No training scheduled for this day. Long press on the strip if you want to generate one.';
+    String? contextLine;
+    final List<Widget> pills = <Widget>[];
+    Widget? primaryAction;
+    Widget? secondaryAction;
+    Color accentColor = _textMuted;
+    IconData accentIcon = Icons.event_available_rounded;
+    String statusBadge = slot.isCurrentDay ? 'Rest Day' : 'Selected';
+
+    if (slot.loggedWorkout != null) {
+      final _WorkoutLogItem log = slot.loggedWorkout!;
+      eyebrow = slot.isCurrentDay ? 'Today Logged' : 'Past Session';
+      title = log.title;
+      accentColor = _accentGreen;
+      accentIcon = Icons.check_circle_rounded;
+      statusBadge = 'Completed';
+      body = log.focus.isNotEmpty
+          ? log.focus
+          : 'This session has already been logged.';
+      contextLine =
+          'Week $weekNumber · ${slot.weekdayLabel}${log.durationMinutes != null ? ' · ${log.durationMinutes} min session' : ''}';
+      pills.add(
+        _DetailPill(
+          label: '${log.completedSetCount}/${log.setCount} sets complete',
+        ),
+      );
+      pills.add(_DetailPill(label: '${log.totalReps.round()} reps'));
+      if (log.hasEstimatedVolume) {
+        pills.add(
+          _DetailPill(
+            label:
+                '${_formatVolumeValue(log.estimatedVolume!)} ${log.estimatedVolumeUnit}',
+          ),
+        );
+      }
+      if (log.durationMinutes != null) {
+        pills.add(_DetailPill(label: '${log.durationMinutes} min'));
+      }
+      primaryAction = OutlinedButton(
+        onPressed: onOpenLoggedWorkout,
+        child: const Text('Open Review'),
+      );
+    } else if (slot.draftSummary != null) {
+      final _WorkoutSessionDraftSummary draft = slot.draftSummary!;
+      eyebrow = slot.isCurrentDay ? 'Resume Session' : 'In Progress';
+      title = draft.title;
+      accentColor = const Color(0xFFFFB454);
+      accentIcon = Icons.play_circle_fill_rounded;
+      statusBadge = 'In Progress';
+      body = draft.focus.isNotEmpty
+          ? draft.focus
+          : 'You have a saved session draft ready to continue.';
+      final int remainingSets = math.max(
+        0,
+        draft.setCount - draft.completedSetCount,
+      );
+      contextLine =
+          'Week $weekNumber · ${slot.weekdayLabel} · Saved ${_draftUpdatedLabel(draft.updatedAt)}${remainingSets > 0 ? ' · $remainingSets sets left' : ''}';
+      pills.add(
+        _DetailPill(
+          label: '${draft.completedSetCount}/${draft.setCount} sets complete',
+        ),
+      );
+      pills.add(_DetailPill(label: _draftStepLabel(draft.currentStep)));
+      if (draft.totalReps > 0) {
+        pills.add(_DetailPill(label: '${draft.totalReps.round()} reps'));
+      }
+      if (draft.hasEstimatedVolume) {
+        pills.add(
+          _DetailPill(
+            label:
+                '${_formatVolumeValue(draft.estimatedVolume!)} ${draft.estimatedVolumeUnit}',
+          ),
+        );
+      }
+      primaryAction = FilledButton(
+        onPressed: onResumeDraft,
+        child: const Text('Resume Workout'),
+      );
+    } else if (slot.workout != null) {
+      final _TrainingPlanWorkout workout = slot.workout!;
+      eyebrow = slot.isCurrentDay ? 'Train Today' : 'Upcoming Session';
+      title = workout.title;
+      accentColor = slot.isCurrentDay ? const Color(0xFFFFD166) : _accentBlue;
+      accentIcon = slot.isCurrentDay
+          ? Icons.fitness_center_rounded
+          : Icons.schedule_rounded;
+      statusBadge = slot.isCurrentDay ? 'Ready' : 'Upcoming';
+      body = workout.focus.isNotEmpty
+          ? workout.focus
+          : 'Your coach has a session ready for this day.';
+      contextLine = slot.isCurrentDay
+          ? 'Today\'s objective · ${workout.exercises.length} exercises planned'
+          : 'Week $weekNumber · ${slot.weekdayLabel} · ${workout.exercises.length} exercises planned';
+      for (final _PlannedExercise exercise in workout.exercises.take(3)) {
+        pills.add(_DetailPill(label: exercise.title));
+      }
+      primaryAction = FilledButton(
+        onPressed: onPreviewWorkout,
+        child: Text(slot.isCurrentDay ? 'Start Workout' : 'Preview Workout'),
+      );
+    } else if (slot.isCurrentDay && upcomingWorkout != null) {
+      eyebrow = 'Next Session';
+      title = upcomingWorkout!.title;
+      accentColor = _accentBlue;
+      accentIcon = Icons.schedule_rounded;
+      statusBadge = 'Upcoming';
+      body = upcomingWorkout!.focus.isNotEmpty
+          ? upcomingWorkout!.focus
+          : 'No session is scheduled for today, but the next one is already queued up.';
+      contextLine =
+          '${_nextSessionLabel(upcomingWorkout!)} · ${upcomingWorkout!.plannedExercises.length} exercises planned';
+      pills.add(_DetailPill(label: 'Week ${upcomingWorkout!.weekNumber}'));
+      pills.add(_DetailPill(label: upcomingWorkout!.relativeLabel));
+      secondaryAction = Text(
+        'Current week: $currentWeekNumber',
+        style: const TextStyle(
+          fontSize: 13,
+          color: _textMuted,
+        ),
+      );
+    } else {
+      contextLine = slot.isCurrentDay
+          ? 'Use today to recover, walk, and be ready for the next lift.'
+          : 'Week $weekNumber · ${slot.weekdayLabel}';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: accentColor.withValues(alpha: 0.32)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            accentColor.withValues(alpha: 0.08),
+            _surface,
+          ],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: accentColor.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Icon(
+                  accentIcon,
+                  color: accentColor,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      eyebrow,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: accentColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: accentColor.withValues(alpha: 0.28),
+                        ),
+                      ),
+                      child: Text(
+                        statusBadge,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: accentColor,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: _textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            body,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              color: _textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            contextLine,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: accentColor.withValues(alpha: 0.92),
+            ),
+          ),
+          if (pills.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: pills,
+            ),
+          ],
+          if (primaryAction != null || secondaryAction != null) ...<Widget>[
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                if (primaryAction != null) primaryAction,
+                if (primaryAction != null && secondaryAction != null)
+                  const SizedBox(width: 12),
+                if (secondaryAction != null)
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: secondaryAction,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   String _draftStepLabel(int currentStep) {
     if (currentStep <= 0) {
@@ -4544,235 +5159,23 @@ class _WorkoutDayDetailCard extends StatelessWidget {
     return '${age.inDays} d ago';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (slot.loggedWorkout != null) {
-      final _WorkoutLogItem log = slot.loggedWorkout!;
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: _surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: _outline),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              '${slot.weekdayLabel} · Completed',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: _accentGreen,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              log.title,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: _textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              log.focus.isNotEmpty ? log.focus : 'Workout logged successfully.',
-              style: const TextStyle(
-                fontSize: 15,
-                height: 1.45,
-                color: _textSecondary,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: <Widget>[
-                _DetailPill(
-                  label: '${log.completedSetCount}/${log.setCount} sets',
-                ),
-                _DetailPill(label: '${log.totalReps.toStringAsFixed(0)} reps'),
-                if (log.hasEstimatedVolume)
-                  _DetailPill(
-                    label:
-                        '${_formatVolumeValue(log.estimatedVolume!)} ${log.estimatedVolumeUnit}',
-                  ),
-                if (log.durationMinutes != null)
-                  _DetailPill(label: '${log.durationMinutes} min'),
-              ],
-            ),
-            if (log.sessionNotes.trim().isNotEmpty) ...<Widget>[
-              const SizedBox(height: 14),
-              Text(
-                log.sessionNotes.trim(),
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                  color: _textSecondary,
-                ),
-              ),
-            ],
-            if (onReview != null) ...<Widget>[
-              const SizedBox(height: 16),
-              OutlinedButton(
-                onPressed: onReview,
-                child: const Text('Session Review'),
-              ),
-            ],
-          ],
-        ),
-      );
+  String _nextSessionLabel(_UpcomingWorkoutData workout) {
+    if (workout.relativeLabel == 'Today') {
+      return 'Today';
     }
 
-    if (slot.draftSummary != null && slot.workout != null) {
-      final _WorkoutSessionDraftSummary draft = slot.draftSummary!;
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: _surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: _outline),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              '${slot.weekdayLabel} · In Progress',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFFFFB454),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              draft.title,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: _textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              draft.focus.isNotEmpty
-                  ? draft.focus
-                  : 'Your session draft is saved on this device and ready to resume.',
-              style: const TextStyle(
-                fontSize: 15,
-                height: 1.45,
-                color: _textSecondary,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: <Widget>[
-                _DetailPill(
-                  label:
-                      '${draft.completedSetCount}/${draft.setCount} sets complete',
-                ),
-                _DetailPill(label: '${draft.totalReps.round()} reps'),
-                if (draft.hasEstimatedVolume)
-                  _DetailPill(
-                    label:
-                        '${_formatVolumeValue(draft.estimatedVolume!)} ${draft.estimatedVolumeUnit}',
-                  ),
-                if (draft.durationMinutes != null)
-                  _DetailPill(label: '${draft.durationMinutes} min'),
-                _DetailPill(label: _draftStepLabel(draft.currentStep)),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Saved ${_draftUpdatedLabel(draft.updatedAt)}',
-              style: const TextStyle(
-                fontSize: 13,
-                color: _textMuted,
-              ),
-            ),
-            if (onStart != null) ...<Widget>[
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: onStart,
-                child: const Text('Resume Workout'),
-              ),
-            ],
-          ],
-        ),
-      );
+    final int today = DateTime.now().weekday;
+    if (workout.weekNumber == currentWeekNumber &&
+        workout.dayNumber == today + 1) {
+      return 'Tomorrow';
     }
-
-    if (!slot.hasWorkout || slot.workout == null) {
-      return const SizedBox.shrink();
+    if (workout.weekNumber == currentWeekNumber) {
+      return 'Later this week';
     }
-
-    final _TrainingPlanWorkout workout = slot.workout!;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            '${slot.weekdayLabel} · Week $currentWeekNumber of $totalWeeks',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: slot.isCurrentDay ? const Color(0xFFFFD166) : _accentBlue,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            workout.title,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: _textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            workout.focus,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.45,
-              color: _textSecondary,
-            ),
-          ),
-          if (workout.exercises.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: workout.exercises
-                  .take(4)
-                  .map(
-                    (_PlannedExercise exercise) =>
-                        _DetailPill(label: exercise.title),
-                  )
-                  .toList(growable: false),
-            ),
-          ],
-          if (onStart != null) ...<Widget>[
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: onStart,
-              child: Text(slot.isCurrentDay ? 'Start Workout' : 'Open Workout'),
-            ),
-          ],
-        ],
-      ),
-    );
+    if (workout.weekNumber == currentWeekNumber + 1) {
+      return 'Next week';
+    }
+    return 'Week ${workout.weekNumber}';
   }
 }
 
@@ -6866,6 +7269,16 @@ class _UpcomingWorkoutData {
       .toList();
 }
 
+class _ResumableWorkoutContext {
+  const _ResumableWorkoutContext({
+    required this.draft,
+    required this.workout,
+  });
+
+  final _WorkoutSessionDraftSummary draft;
+  final _UpcomingWorkoutData workout;
+}
+
 class _WeekdayWorkoutSlot {
   const _WeekdayWorkoutSlot({
     required this.weekdayLabel,
@@ -6885,6 +7298,34 @@ class _WeekdayWorkoutSlot {
 
   bool get hasWorkout => workout != null;
   bool get hasDraft => draftSummary != null;
+}
+
+class _PlannedExerciseExplanationResponse {
+  const _PlannedExerciseExplanationResponse({
+    required this.exerciseTitle,
+    required this.reason,
+    required this.support,
+    required this.execution,
+    required this.movementPattern,
+  });
+
+  factory _PlannedExerciseExplanationResponse.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return _PlannedExerciseExplanationResponse(
+      exerciseTitle: (json['exercise_title'] as String?) ?? '',
+      reason: (json['reason'] as String?) ?? '',
+      support: (json['support'] as String?) ?? '',
+      execution: (json['execution'] as String?) ?? '',
+      movementPattern: (json['movement_pattern'] as String?) ?? '',
+    );
+  }
+
+  final String exerciseTitle;
+  final String reason;
+  final String support;
+  final String execution;
+  final String movementPattern;
 }
 
 class _RecentWorkoutLogsCard extends StatelessWidget {
@@ -7102,49 +7543,58 @@ class _WorkoutReviewScreen extends StatelessWidget {
                     children: <Widget>[
                       const _SectionTitle('Intensity'),
                       const SizedBox(height: 12),
-                      Row(
-                        children: <Widget>[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _surfaceRaised,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: _outline),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Icon(
+                              _intensityIcon(reviewDetails.feelLabel),
+                              size: 16,
+                              color: _textPrimary,
                             ),
-                            decoration: BoxDecoration(
-                              color: _surfaceRaised,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: _outline),
+                            const SizedBox(width: 8),
+                            Text(
+                              reviewDetails.feelLabel,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _textPrimary,
+                              ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: <Widget>[
-                                Icon(
-                                  _intensityIcon(reviewDetails.feelLabel),
-                                  size: 16,
-                                  color: _textPrimary,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  reviewDetails.feelLabel,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: _textPrimary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       if (reviewDetails
                           .parsedFeedback.note.isNotEmpty) ...<Widget>[
                         const SizedBox(height: 12),
-                        Text(
-                          reviewDetails.parsedFeedback.note,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            height: 1.5,
-                            color: _textSecondary,
+                        RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                              fontSize: 15,
+                              height: 1.5,
+                              color: _textSecondary,
+                            ),
+                            children: <InlineSpan>[
+                              const TextSpan(
+                                text: 'Athlete note: ',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: _textPrimary,
+                                ),
+                              ),
+                              TextSpan(
+                                text: reviewDetails.parsedFeedback.note,
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -8411,7 +8861,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
 
   void _finishSession() {
     final String sanitizedNote =
-        _sanitizeCoachNote(_sessionNotesController.text.trim());
+        _sanitizeAthleteNote(_sessionNotesController.text.trim());
     if (sanitizedNote != _sessionNotesController.text.trim()) {
       _sessionNotesController.value = TextEditingValue(
         text: sanitizedNote,
@@ -8442,125 +8892,136 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
   }
 
   Future<void> _showExerciseExplanation(int exerciseIndex) async {
-    final _PlannedExercise? plannedExercise =
-        exerciseIndex < widget.workout.plannedExercises.length
-            ? widget.workout.plannedExercises[exerciseIndex]
-            : null;
-    final String title =
-        plannedExercise?.title ?? _exercises[exerciseIndex].title;
-    final String execution = plannedExercise?.notes.trim().isNotEmpty == true
-        ? plannedExercise!.notes.trim()
-        : _exerciseGuidance(title);
-
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (BuildContext context) {
-        return _ExerciseExplanationSheet(
-          title: title,
-          reason: _exerciseReason(title),
-          support: _exerciseSupportPath(),
-          execution: execution,
-          movementPattern: _movementPatternLabel(title),
+        return FutureBuilder<_PlannedExerciseExplanationResponse>(
+          future: _loadPlannedExerciseExplanation(exerciseIndex),
+          builder: (
+            BuildContext context,
+            AsyncSnapshot<_PlannedExerciseExplanationResponse> snapshot,
+          ) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const _ExerciseExplanationLoadingSheet();
+            }
+
+            if (snapshot.hasError || !snapshot.hasData) {
+              return _ExerciseExplanationErrorSheet(
+                message: snapshot.error is _UiException
+                    ? (snapshot.error as _UiException).message
+                    : 'Could not load the coach explanation for this exercise.',
+              );
+            }
+
+            final _PlannedExerciseExplanationResponse explanation =
+                snapshot.data!;
+            return _ExerciseExplanationSheet(
+              title: explanation.exerciseTitle,
+              reason: explanation.reason,
+              support: explanation.support,
+              execution: explanation.execution,
+              movementPattern: explanation.movementPattern,
+            );
+          },
         );
       },
     );
   }
 
-  String _exerciseReason(String title) {
-    final String lower = title.toLowerCase();
-    final List<String> parts = <String>[
-      if (widget.workout.focus.trim().isNotEmpty)
-        _exerciseExplanationFirstSentence(widget.workout.focus),
-    ];
-    if (lower.contains('squat')) {
-      parts.add(
-          'It reinforces lower-body strength, bracing, and position under load.');
-    } else if (lower.contains('deadlift') ||
-        lower.contains('rdl') ||
-        lower.contains('hinge')) {
-      parts.add(
-          'It builds posterior-chain strength and helps you own the hinge pattern under fatigue.');
-    } else if (lower.contains('bench') || lower.contains('press')) {
-      parts.add(
-          'It develops pressing force while keeping the upper body contributing to the larger block objective.');
-    } else if (lower.contains('row') || lower.contains('pull')) {
-      parts.add(
-          'It supports upper-back balance, posture, and better positions on the bigger lifts.');
-    } else if (lower.contains('carry')) {
-      parts.add(
-          'It ties trunk stability, grip, and positional control together in a way that carries into the main lifts.');
-    } else if (lower.contains('split squat') || lower.contains('lunge')) {
-      parts.add(
-          'It gives you single-leg strength and control that keeps the main bilateral work cleaner.');
-    } else {
-      parts.add(
-          'It exists to support the day objective with repeatable, coachable work.');
+  Future<_PlannedExerciseExplanationResponse> _loadPlannedExerciseExplanation(
+    int exerciseIndex,
+  ) async {
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw const _UiException('Sign in again to load coach explanations.');
     }
-    return parts.join(' ');
+
+    final String? token = await user.getIdToken(true);
+    if (token == null || token.isEmpty) {
+      throw const _UiException(
+          'Could not verify your session for the coach explanation.');
+    }
+
+    final Uri uri = _buildPlannedExerciseExplanationUri(widget.plan.planID);
+    final http.Response response;
+    try {
+      response = await http
+          .post(
+            uri,
+            headers: <String, String>{
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+              HttpHeaders.contentTypeHeader: 'application/json',
+            },
+            body: jsonEncode(<String, int>{
+              'week_number': widget.workout.weekNumber,
+              'day_number': widget.workout.dayNumber,
+              'exercise_index': exerciseIndex,
+            }),
+          )
+          .timeout(_backendRequestTimeout);
+    } on SocketException {
+      throw const _UiException(
+        'Could not reach the backend for this explanation. Check your connection and try again.',
+      );
+    } on TimeoutException {
+      throw const _UiException(
+        'The coach explanation took too long to load. Please try again.',
+      );
+    } on http.ClientException {
+      throw const _UiException(
+        'The app could not load the coach explanation right now.',
+      );
+    }
+
+    if (response.statusCode >= 400) {
+      throw _UiException(
+        _extractBackendErrorMessage(response.body) ??
+            'Could not load the coach explanation for this exercise.',
+      );
+    }
+
+    final Object? decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw const _UiException(
+        'The backend returned an invalid exercise explanation.',
+      );
+    }
+
+    return _PlannedExerciseExplanationResponse.fromJson(decoded);
   }
 
-  String _exerciseSupportPath() {
-    final int nextWeekNumber = math.min(
-      widget.plan.durationWeeks,
-      widget.workout.weekNumber + 1,
+  Uri _buildPlannedExerciseExplanationUri(int trainingPlanID) {
+    final Uri baseUri = AppBackend.trainingPlans();
+    final String normalizedPath = baseUri.path.endsWith('/')
+        ? baseUri.path.substring(0, baseUri.path.length - 1)
+        : baseUri.path;
+
+    return baseUri.replace(
+      path: '$normalizedPath/$trainingPlanID/exercise-explanation',
     );
-    _TrainingPlanWeek? nextWeek;
-    for (final _TrainingPlanWeek week in widget.plan.weeks) {
-      if (week.weekNumber == nextWeekNumber) {
-        nextWeek = week;
-        break;
-      }
-    }
-    if (nextWeek != null && nextWeek.theme.trim().isNotEmpty) {
-      return 'This supports the next stage of the block: ${nextWeek.theme.trim()}.';
-    }
-    if (widget.plan.progressionStrategy.trim().isNotEmpty) {
-      return _exerciseExplanationFirstSentence(widget.plan.progressionStrategy);
-    }
-    return 'This sets up stronger work later in the block by keeping the signal clean now.';
   }
 
-  String _movementPatternLabel(String title) {
-    final String lower = title.toLowerCase();
-    if (lower.contains('squat')) {
-      return 'Squat';
-    }
-    if (lower.contains('deadlift') ||
-        lower.contains('rdl') ||
-        lower.contains('hinge')) {
-      return 'Hinge';
-    }
-    if (lower.contains('bench') || lower.contains('press')) {
-      return 'Press';
-    }
-    if (lower.contains('row') || lower.contains('pull')) {
-      return 'Pull';
-    }
-    if (lower.contains('carry')) {
-      return 'Carry';
-    }
-    if (lower.contains('split squat') || lower.contains('lunge')) {
-      return 'Single-leg';
-    }
-    if (lower.contains('plank') ||
-        lower.contains('carry') ||
-        lower.contains('rotation')) {
-      return 'Trunk';
-    }
-    return 'Assistance';
-  }
-
-  String _exerciseExplanationFirstSentence(String text) {
-    final String trimmed = text.trim();
+  String? _extractBackendErrorMessage(String body) {
+    final String trimmed = body.trim();
     if (trimmed.isEmpty) {
-      return '';
+      return null;
     }
 
-    final RegExp sentenceBoundary = RegExp(r'(?<=[.!?])\s+');
-    final List<String> parts = trimmed.split(sentenceBoundary);
-    return parts.first.trim();
+    try {
+      final Object? decoded = jsonDecode(trimmed);
+      if (decoded is Map<String, dynamic>) {
+        final Object? error = decoded['error'];
+        if (error is String && error.trim().isNotEmpty) {
+          return error.trim();
+        }
+      }
+    } catch (_) {
+      // Ignore parsing failure and fall through.
+    }
+
+    return trimmed.length <= 180 ? trimmed : null;
   }
 
   bool _showsNumericValueField(String unit) {
@@ -8694,7 +9155,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
     }
 
     final RegExp prefixedPattern = RegExp(
-      r'^Session feel:\s*(Easy|Good|Hard|Brutal)\.?(?:\s*(?:Athlete|Coach) note:\s*(.*))?$',
+      r'^Session feel:\s*(Easy|Good|Hard|Brutal)\.?(?:\s*Athlete note:\s*(.*))?$',
       caseSensitive: false,
       dotAll: true,
     );
@@ -8726,7 +9187,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
     return 'Good';
   }
 
-  String _sanitizeCoachNote(String raw) {
+  String _sanitizeAthleteNote(String raw) {
     String sanitized = raw
         .replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F]'), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
@@ -8790,7 +9251,7 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
   String _composeSessionNotes() {
     final String feel = _sessionFeelLabels[_sessionFeelIndex];
     final String sanitizedNote =
-        _sanitizeCoachNote(_sessionNotesController.text.trim());
+        _sanitizeAthleteNote(_sessionNotesController.text.trim());
     if (sanitizedNote.isEmpty) {
       return 'Session feel: $feel.';
     }
@@ -8919,6 +9380,16 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
     }
 
     final _WorkoutSessionDraftSnapshot snapshot = _buildDraftSnapshot();
+    if (!_hasPersistableDraftProgress(snapshot)) {
+      await widget.localCacheRepository.clearWorkoutSessionDraft(
+        firebaseUid: firebaseUid,
+        trainingPlanId: snapshot.trainingPlanID,
+        weekNumber: snapshot.weekNumber,
+        dayNumber: snapshot.dayNumber,
+      );
+      return;
+    }
+
     await widget.localCacheRepository.saveWorkoutSessionDraft(
       firebaseUid: firebaseUid,
       trainingPlanId: snapshot.trainingPlanID,
@@ -8926,6 +9397,17 @@ class _WorkoutSessionScreenState extends State<_WorkoutSessionScreen>
       dayNumber: snapshot.dayNumber,
       payloadJson: jsonEncode(snapshot.toJson()),
     );
+  }
+
+  bool _hasPersistableDraftProgress(_WorkoutSessionDraftSnapshot snapshot) {
+    for (final _WorkoutLogDraftExercise exercise in snapshot.exercises) {
+      for (final _WorkoutLogDraftSet set in exercise.sets) {
+        if (set.completed) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }
 
@@ -8982,15 +9464,38 @@ class _SessionFeelSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final int safeIndex = selectedIndex.clamp(0, labels.length - 1);
+    final String selectedLabel = labels[safeIndex];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          labels[safeIndex],
-          style: const TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            color: _textPrimary,
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 10,
+          ),
+          decoration: BoxDecoration(
+            color: _surfaceRaised,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: _outline),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(
+                _sessionFeelIcon(selectedLabel),
+                size: 18,
+                color: _textPrimary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                selectedLabel,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: _textPrimary,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
@@ -9041,6 +9546,21 @@ class _SessionFeelSelector extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  IconData _sessionFeelIcon(String feelLabel) {
+    switch (feelLabel.trim().toLowerCase()) {
+      case 'easy':
+        return Icons.sentiment_satisfied_alt_rounded;
+      case 'good':
+        return Icons.check_circle_rounded;
+      case 'hard':
+        return Icons.fitness_center_rounded;
+      case 'brutal':
+        return Icons.local_fire_department_rounded;
+      default:
+        return Icons.bolt_rounded;
+    }
   }
 }
 
@@ -10004,6 +10524,90 @@ class _WorkoutSetCountButton extends StatelessWidget {
   }
 }
 
+class _ExerciseExplanationLoadingSheet extends StatelessWidget {
+  const _ExerciseExplanationLoadingSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _outline),
+        ),
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 2.4),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Loading coach explanation...',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: _textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExerciseExplanationErrorSheet extends StatelessWidget {
+  const _ExerciseExplanationErrorSheet({
+    required this.message,
+  });
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _outline),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              'Coach explanation unavailable',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: _textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.55,
+                color: _textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ExerciseExplanationSheet extends StatelessWidget {
   const _ExerciseExplanationSheet({
     required this.title,
@@ -10091,7 +10695,7 @@ class _ExerciseExplanationSheet extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Coach note',
+              'Execution note',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -10865,6 +11469,12 @@ class _MultiSelectChips<T> extends StatelessWidget {
 
 class _UiException implements Exception {
   const _UiException(this.message);
+
+  final String message;
+}
+
+class _BackendConnectivityException implements Exception {
+  const _BackendConnectivityException(this.message);
 
   final String message;
 }

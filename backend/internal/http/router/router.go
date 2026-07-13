@@ -14,6 +14,7 @@ func New(
 	workoutsHandler *handlers.WorkoutsHandler,
 	workoutLogsHandler *handlers.WorkoutLogsHandler,
 	workoutExplanationHandler *handlers.WorkoutExplanationHandler,
+	plannedExerciseExplanationHandler *handlers.PlannedExerciseExplanationHandler,
 	trainingPlansHandler *handlers.TrainingPlansHandler,
 	authentication *middleware.Authentication,
 ) *gin.Engine {
@@ -49,6 +50,9 @@ func New(
 		if trainingPlansHandler != nil {
 			protected.POST("/training-plans", trainingPlansHandler.Create)
 			protected.GET("/training-plans/latest", trainingPlansHandler.Latest)
+			if plannedExerciseExplanationHandler != nil {
+				protected.POST("/training-plans/:id/exercise-explanation", plannedExerciseExplanationHandler.Create)
+			}
 			protected.POST("/training-plans/:id/weekly-preview", trainingPlansHandler.GenerateWeeklyPreview)
 			protected.POST("/training-plans/:id/generate-day", trainingPlansHandler.GenerateDay)
 			protected.POST("/training-plans/:id/move-workout", trainingPlansHandler.MoveWorkout)

@@ -76,6 +76,9 @@ func main() {
 	workoutExplanationHandler := httpHandlers.NewWorkoutExplanationHandler(
 		coaching.NewWorkoutExplainerServiceWithAccessControl(workoutStore, userStore, freeWorkoutExplainer, paidWorkoutExplainer, cfg.AIDailyWorkoutExplanationLimit),
 	)
+	plannedExerciseExplanationHandler := httpHandlers.NewPlannedExerciseExplanationHandler(
+		coaching.NewPlannedExerciseExplainerService(trainingPlanStore),
+	)
 
 	freeWorkoutLogReviewer := ai.NewMockWorkoutLogReviewer(cfg.AIModel)
 	paidWorkoutLogReviewer, err := buildWorkoutLogReviewer(cfg)
@@ -108,7 +111,7 @@ func main() {
 		coaching.NewWeeklyCoachingPreviewServiceWithAccessControl(trainingPlanStore, userStore, freeWeeklyCoachingPreviewer, paidWeeklyCoachingPreviewer),
 	)
 
-	router := httpRouter.New(healthHandler, authHandler, promoCodeHandler, importHandler, workoutsHandler, workoutLogsHandler, workoutExplanationHandler, trainingPlansHandler, authentication)
+	router := httpRouter.New(healthHandler, authHandler, promoCodeHandler, importHandler, workoutsHandler, workoutLogsHandler, workoutExplanationHandler, plannedExerciseExplanationHandler, trainingPlansHandler, authentication)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddress(),
