@@ -1,4 +1,4 @@
-package com.ai_fitness_coach
+package com.liftsforge.app
 
 import io.flutter.embedding.android.FlutterActivity
 

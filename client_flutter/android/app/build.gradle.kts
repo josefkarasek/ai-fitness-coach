@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.ai_fitness_coach"
+    namespace = "com.liftsforge.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -17,7 +17,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.ai_fitness_coach"
+        applicationId = "com.liftsforge.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

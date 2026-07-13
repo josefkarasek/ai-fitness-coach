@@ -23,6 +23,7 @@ func New(
 	r.Use(gin.Logger(), gin.Recovery())
 	if landingHandler != nil {
 		r.GET("/", landingHandler.Home)
+		r.GET("/favicon.svg", landingHandler.Favicon)
 	}
 
 	v1 := r.Group("/api/v1")
