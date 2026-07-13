@@ -17,7 +17,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
       RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
       RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE }}
       RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT }}
@@ -78,7 +78,7 @@ jobs:
 
       - name: Validate Railway configuration
         run: |
-          test -n "$RAILWAY_TOKEN"
+          test -n "$RAILWAY_API_TOKEN"
           test -n "$RAILWAY_PROJECT_ID"
           test -n "$RAILWAY_SERVICE"
           test -n "$RAILWAY_ENVIRONMENT"
