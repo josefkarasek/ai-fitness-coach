@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/josefkarasek/ai-fitness-coach/backend/internal/ai"
 	backendAuth "github.com/josefkarasek/ai-fitness-coach/backend/internal/auth/firebase"
 	"github.com/josefkarasek/ai-fitness-coach/backend/internal/coaching"
@@ -23,6 +24,11 @@ import (
 
 func main() {
 	cfg := config.Load()
+
+	if ginMode := os.Getenv("GIN_MODE"); ginMode != "" {
+		gin.SetMode(ginMode)
+	}
+
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		AddSource: true,
 		Level:     cfg.LogLevel,

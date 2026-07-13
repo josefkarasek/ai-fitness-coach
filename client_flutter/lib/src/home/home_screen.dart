@@ -23,7 +23,7 @@ const Color _textSecondary = Color(0xFFB1BBC8);
 const Color _textMuted = Color(0xFF808B98);
 const Color _accentGreen = Color(0xFF42D392);
 const Color _accentBlue = Color(0xFF5EA4FF);
-const String _backendBaseUrl = 'https://6dab-213-210-177-121.ngrok-free.app';
+const String _backendBaseUrl = 'https://liftsforge.com';
 const List<String> _storedSessionFeelLabels = <String>[
   'Easy',
   'Good',
