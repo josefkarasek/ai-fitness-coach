@@ -23,10 +23,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         return macos;
       case TargetPlatform.windows:
@@ -74,9 +71,18 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAw2HhH98oJZZyI8joXT1QvEuFcT3h0F0M',
-    appId: '1:636200481801:android:a9d5f9ad68bc99572af4d8',
+    appId: '1:636200481801:android:10150820864b9be12af4d8',
     messagingSenderId: '636200481801',
     projectId: 'ai-fitness-coach-c0d30',
     storageBucket: 'ai-fitness-coach-c0d30.firebasestorage.app',
+  );
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyAUlut2Kw3PaVfGiPKwYJ4bvEjqJFRYdqk',
+    appId: '1:636200481801:ios:3136097cb9013aca2af4d8',
+    messagingSenderId: '636200481801',
+    projectId: 'ai-fitness-coach-c0d30',
+    storageBucket: 'ai-fitness-coach-c0d30.firebasestorage.app',
+    iosClientId: '636200481801-0mu6copm6ijmfkp0ketvpbaq64j7eocb.apps.googleusercontent.com',
+    iosBundleId: 'com.liftsforge.app',
   );
 }
