@@ -123,7 +123,13 @@ jobs:
 
       - name: Pod install
         working-directory: ${{ env.IOS_PATH }}
-        run: pod install
+        run: |
+          set -euo pipefail
+          if [ -f Podfile ]; then
+            pod install
+          else
+            echo "No Podfile present, skipping pod install."
+          fi
 
       - name: Build Flutter iOS app
         working-directory: ${{ env.APP_PATH }}
