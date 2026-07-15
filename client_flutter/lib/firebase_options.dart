@@ -56,7 +56,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '636200481801',
     projectId: 'ai-fitness-coach-c0d30',
     storageBucket: 'ai-fitness-coach-c0d30.firebasestorage.app',
-    iosBundleId: 'com.example.aiFitnessCoach',
+    iosBundleId: 'com.liftsforge.app',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
