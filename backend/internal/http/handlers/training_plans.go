@@ -23,12 +23,18 @@ type TrainingPlanService interface {
 	SkipWorkout(ctx context.Context, user auth.User, trainingPlanID int64, weekNumber int, dayNumber int) (coaching.TrainingPlanResult, error)
 }
 
+type TrainingPlanJobService interface {
+	Submit(ctx context.Context, user auth.User, request ai.TrainingPlanRequest) (coaching.TrainingPlanJob, bool, error)
+	Get(ctx context.Context, user auth.User, jobID string) (coaching.TrainingPlanJob, error)
+}
+
 type WeeklyCoachingPreviewService interface {
 	GenerateForNextWeek(ctx context.Context, user auth.User, trainingPlanID int64, currentWeek int) (coaching.WeeklyCoachingPreviewResult, error)
 }
 
 type TrainingPlansHandler struct {
 	service   TrainingPlanService
+	jobs      TrainingPlanJobService
 	previewer WeeklyCoachingPreviewService
 }
 
@@ -48,9 +54,10 @@ type createTrainingPlanRequest struct {
 	} `json:"profile"`
 }
 
-func NewTrainingPlansHandler(service TrainingPlanService, previewer WeeklyCoachingPreviewService) *TrainingPlansHandler {
+func NewTrainingPlansHandler(service TrainingPlanService, jobs TrainingPlanJobService, previewer WeeklyCoachingPreviewService) *TrainingPlansHandler {
 	return &TrainingPlansHandler{
 		service:   service,
+		jobs:      jobs,
 		previewer: previewer,
 	}
 }
@@ -74,7 +81,12 @@ func (h *TrainingPlansHandler) Create(c *gin.Context) {
 		return
 	}
 
-	result, err := h.service.GenerateTrainingPlan(c.Request.Context(), user, request)
+	if h.jobs == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "training plan jobs unavailable"})
+		return
+	}
+
+	job, created, err := h.jobs.Submit(c.Request.Context(), user, request)
 	if err != nil {
 		h.logTrainingPlanError("create training plan failed", user, err,
 			"objective", request.Objective,
@@ -93,7 +105,7 @@ func (h *TrainingPlansHandler) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, serializeTrainingPlanResult(result))
+	c.JSON(http.StatusAccepted, serializeTrainingPlanJob(job, created))
 }
 
 func (h *TrainingPlansHandler) Latest(c *gin.Context) {
@@ -116,6 +128,38 @@ func (h *TrainingPlansHandler) Latest(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, serializeTrainingPlanResult(result))
+}
+
+func (h *TrainingPlansHandler) Job(c *gin.Context) {
+	user, ok := middleware.UserFromGinContext(c)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "authenticated user missing from request context"})
+		return
+	}
+	if h.jobs == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "training plan jobs unavailable"})
+		return
+	}
+
+	jobID := strings.TrimSpace(c.Param("id"))
+	if jobID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid training plan job id"})
+		return
+	}
+
+	job, err := h.jobs.Get(c.Request.Context(), user, jobID)
+	if err != nil {
+		h.logTrainingPlanError("load training plan job failed", user, err, "job_id", jobID)
+		switch {
+		case errors.Is(err, coaching.ErrNoTrainingPlanFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "training plan job not found"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "load training plan job"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, serializeTrainingPlanJob(job, false))
 }
 
 func (h *TrainingPlansHandler) GenerateWeeklyPreview(c *gin.Context) {
@@ -430,4 +474,26 @@ func serializeTrainingPlanResult(result coaching.TrainingPlanResult) gin.H {
 		"generated_today":      result.GeneratedToday,
 		"remaining_today":      result.RemainingToday,
 	}
+}
+
+func serializeTrainingPlanJob(job coaching.TrainingPlanJob, created bool) gin.H {
+	response := gin.H{
+		"id":                 job.ID,
+		"created":            created,
+		"status":             job.Status,
+		"objective":          job.Request.Objective,
+		"duration_weeks":     job.Request.DurationWeeks,
+		"days_per_week":      job.Request.DaysPerWeek,
+		"measurement_system": job.Request.MeasurementSystem,
+		"created_at":         job.CreatedAt,
+		"updated_at":         job.UpdatedAt,
+		"started_at":         job.StartedAt,
+		"completed_at":       job.CompletedAt,
+		"error_message":      job.ErrorMessage,
+	}
+	if job.TrainingPlanID != nil {
+		response["training_plan_id"] = *job.TrainingPlanID
+	}
+
+	return response
 }

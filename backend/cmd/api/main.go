@@ -18,6 +18,7 @@ import (
 	httpHandlers "github.com/josefkarasek/ai-fitness-coach/backend/internal/http/handlers"
 	httpMiddleware "github.com/josefkarasek/ai-fitness-coach/backend/internal/http/middleware"
 	httpRouter "github.com/josefkarasek/ai-fitness-coach/backend/internal/http/router"
+	"github.com/josefkarasek/ai-fitness-coach/backend/internal/notifications"
 	"github.com/josefkarasek/ai-fitness-coach/backend/internal/storage/postgres"
 	"github.com/josefkarasek/ai-fitness-coach/backend/migrations"
 )
@@ -54,6 +55,7 @@ func main() {
 	landingHandler := httpHandlers.NewLandingHandler()
 	authHandler := httpHandlers.NewAuthHandler()
 	userStore := postgres.NewUserStore(db)
+	deviceTokensHandler := httpHandlers.NewDeviceTokensHandler(userStore)
 	promoCodeHandler := httpHandlers.NewPromoCodeHandler(userStore)
 	importHandler := httpHandlers.NewImportHandler(postgres.NewTrainingHistoryStore(db))
 	workoutStore := postgres.NewWorkoutStore(db)
@@ -107,12 +109,36 @@ func main() {
 		os.Exit(1)
 	}
 
+	trainingPlannerService := coaching.NewTrainingPlannerServiceWithAccessControl(trainingPlanStore, userStore, freeTrainingPlanner, paidTrainingPlanner, cfg.AIDailyTrainingPlanLimit)
+
+	var trainingPlanNotifier coaching.TrainingPlanJobNotifier
+	if cfg.AuthMode == "firebase" && cfg.FirebaseProjectID != "" {
+		notifier, err := notifications.NewFirebasePushNotifier(ctx, cfg.FirebaseProjectID, userStore)
+		if err != nil {
+			logger.Warn("build firebase push notifier", "error", err)
+		} else {
+			trainingPlanNotifier = notifier
+		}
+	}
+
+	trainingPlanJobs := coaching.NewAsyncTrainingPlanService(
+		trainingPlanStore,
+		trainingPlannerService,
+		trainingPlanNotifier,
+		time.Duration(cfg.AITrainingPlanJobTimeout)*time.Second,
+	)
+	if err := trainingPlanJobs.ResumePendingJobs(ctx); err != nil {
+		logger.Error("resume training plan jobs", "error", err)
+		os.Exit(1)
+	}
+
 	trainingPlansHandler := httpHandlers.NewTrainingPlansHandler(
-		coaching.NewTrainingPlannerServiceWithAccessControl(trainingPlanStore, userStore, freeTrainingPlanner, paidTrainingPlanner, cfg.AIDailyTrainingPlanLimit),
+		trainingPlannerService,
+		trainingPlanJobs,
 		coaching.NewWeeklyCoachingPreviewServiceWithAccessControl(trainingPlanStore, userStore, freeWeeklyCoachingPreviewer, paidWeeklyCoachingPreviewer),
 	)
 
-	router := httpRouter.New(landingHandler, healthHandler, authHandler, promoCodeHandler, importHandler, workoutsHandler, workoutLogsHandler, workoutExplanationHandler, plannedExerciseExplanationHandler, trainingPlansHandler, authentication)
+	router := httpRouter.New(landingHandler, healthHandler, authHandler, deviceTokensHandler, promoCodeHandler, importHandler, workoutsHandler, workoutLogsHandler, workoutExplanationHandler, plannedExerciseExplanationHandler, trainingPlansHandler, authentication)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddress(),

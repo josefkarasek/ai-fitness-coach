@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -24,7 +25,11 @@ const Color _textSecondary = Color(0xFFB1BBC8);
 const Color _textMuted = Color(0xFF808B98);
 const Color _accentGreen = Color(0xFF42D392);
 const Color _accentBlue = Color(0xFF5EA4FF);
-const Duration _backendRequestTimeout = Duration(seconds: 20);
+const Duration _backendRequestTimeout = Duration(seconds: 60);
+const String _trainingPlanJobQueuedStatus = 'queued';
+const String _trainingPlanJobRunningStatus = 'running';
+const String _trainingPlanJobCompletedStatus = 'completed';
+const String _trainingPlanJobFailedStatus = 'failed';
 const List<String> _storedSessionFeelLabels = <String>[
   'Easy',
   'Good',
@@ -70,7 +75,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -132,6 +137,7 @@ class _HomeScreenState extends State<HomeScreen>
   _RootTab _selectedRootTab = _RootTab.home;
   String? _selectedWeekday;
   _TrainingPlanResult? _latestTrainingPlan;
+  _TrainingPlanJob? _pendingTrainingPlanJob;
   _WeeklyCoachingPreview? _weeklyCoachingPreview;
   Map<String, _WorkoutSessionDraftSummary> _workoutSessionDraftsByKey =
       <String, _WorkoutSessionDraftSummary>{};
@@ -146,10 +152,14 @@ class _HomeScreenState extends State<HomeScreen>
   late final AnimationController _weekStripAnimationController;
   Animation<double>? _weekStripOffsetAnimation;
   StreamSubscription<User?>? _authStateSubscription;
+  StreamSubscription<String>? _fcmTokenRefreshSubscription;
+  StreamSubscription<RemoteMessage>? _fcmForegroundSubscription;
+  StreamSubscription<RemoteMessage>? _fcmOpenedSubscription;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _weekStripAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
@@ -164,12 +174,17 @@ class _HomeScreenState extends State<HomeScreen>
     _deviceMeasurementSystem = widget.preferences.measurementSystem;
     _authStateSubscription =
         _auth.authStateChanges().listen(_handleAuthStateChanged);
+    _initializeFirebaseMessaging();
     _handleAuthStateChanged(_auth.currentUser);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authStateSubscription?.cancel();
+    _fcmTokenRefreshSubscription?.cancel();
+    _fcmForegroundSubscription?.cancel();
+    _fcmOpenedSubscription?.cancel();
     _weekStripAnimationController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -190,6 +205,89 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshPendingTrainingPlanJobIfNeeded());
+    }
+  }
+
+  Future<void> _initializeFirebaseMessaging() async {
+    final FirebaseMessaging messaging = FirebaseMessaging.instance;
+    await messaging.requestPermission();
+
+    _fcmTokenRefreshSubscription =
+        messaging.onTokenRefresh.listen((String token) {
+      unawaited(_registerDeviceToken(token));
+    });
+    _fcmForegroundSubscription =
+        FirebaseMessaging.onMessage.listen(_handleRemoteMessage);
+    _fcmOpenedSubscription =
+        FirebaseMessaging.onMessageOpenedApp.listen(_handleRemoteMessage);
+
+    final RemoteMessage? initialMessage =
+        await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      _handleRemoteMessage(initialMessage);
+    }
+
+    final String? token = await messaging.getToken();
+    if (token != null && token.isNotEmpty) {
+      await _registerDeviceToken(token);
+    }
+  }
+
+  Future<void> _registerCurrentDeviceToken() async {
+    final String? token = await FirebaseMessaging.instance.getToken();
+    if (token == null || token.isEmpty) {
+      return;
+    }
+    await _registerDeviceToken(token);
+  }
+
+  Future<void> _registerDeviceToken(String token) async {
+    final User? currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      return;
+    }
+
+    try {
+      final String idToken = await _requireIdToken();
+      await _performRequest(
+        () => http.post(
+          AppBackend.deviceTokens(),
+          headers: <String, String>{
+            HttpHeaders.authorizationHeader: 'Bearer $idToken',
+            HttpHeaders.contentTypeHeader: 'application/json',
+          },
+          body: jsonEncode(<String, String>{
+            'token': token,
+            'platform': Platform.isAndroid ? 'android' : 'unknown',
+          }),
+        ),
+        action: 'register push notifications',
+      );
+    } catch (_) {
+      // Best effort only. The app should keep working without push registration.
+    }
+  }
+
+  void _handleRemoteMessage(RemoteMessage message) {
+    final String type = (message.data['type'] ?? '').toString().trim();
+    final String jobID = (message.data['job_id'] ?? '').toString().trim();
+    final String status = (message.data['status'] ?? '').toString().trim();
+    if ((type != 'training_plan_ready' && type != 'training_plan_failed') ||
+        jobID.isEmpty) {
+      return;
+    }
+
+    unawaited(widget.preferences.setRemotePlanSignal(
+      jobID: jobID,
+      status: status.isEmpty ? type : status,
+    ));
+    unawaited(_refreshPendingTrainingPlanJobIfNeeded(force: true));
+  }
+
   Future<void> _handleAuthStateChanged(User? user) async {
     if (!mounted) {
       return;
@@ -205,6 +303,7 @@ class _HomeScreenState extends State<HomeScreen>
         _backendUser = null;
         _selectedWeekday = null;
         _latestTrainingPlan = null;
+        _pendingTrainingPlanJob = null;
         _weeklyCoachingPreview = null;
         _workoutSessionDraftsByKey = <String, _WorkoutSessionDraftSummary>{};
         _viewedWeekNumber = null;
@@ -223,6 +322,8 @@ class _HomeScreenState extends State<HomeScreen>
 
     await _hydrateCachedStateForSignedInUser(user);
     await _hydrateLatestTrainingPlanForSignedInUser();
+    await _registerCurrentDeviceToken();
+    await _refreshPendingTrainingPlanJobIfNeeded();
     await widget.preferences.setLastSignedInUid(user.uid);
 
     if (!mounted) {
@@ -231,7 +332,8 @@ class _HomeScreenState extends State<HomeScreen>
 
     setState(() {
       _loadingAppState = false;
-      _showPlanBuilder = _latestTrainingPlan == null;
+      _showPlanBuilder =
+          _latestTrainingPlan == null && _pendingTrainingPlanJob == null;
     });
     _maybePromptToResumeWorkout();
   }
@@ -278,9 +380,11 @@ class _HomeScreenState extends State<HomeScreen>
 
       setState(() {
         _latestTrainingPlan = plan;
+        _pendingTrainingPlanJob = null;
       });
       final User? currentUser = _auth.currentUser;
       if (currentUser != null) {
+        await widget.preferences.clearPendingTrainingPlanJobID(currentUser.uid);
         await widget.localCacheRepository.cacheTrainingPlan(
           planId: plan.planID,
           firebaseUid: currentUser.uid,
@@ -302,6 +406,115 @@ class _HomeScreenState extends State<HomeScreen>
       // Signed-in hydration should fail quietly and let the UI recover.
     } catch (_) {
       _setStatus('Could not restore your latest coaching state.');
+    }
+  }
+
+  Future<void> _refreshPendingTrainingPlanJobIfNeeded(
+      {bool force = false}) async {
+    final User? currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      return;
+    }
+
+    final String pendingJobID =
+        widget.preferences.getPendingTrainingPlanJobID(currentUser.uid);
+    if (pendingJobID.isEmpty) {
+      if (_pendingTrainingPlanJob != null && mounted) {
+        setState(() {
+          _pendingTrainingPlanJob = null;
+        });
+      }
+      return;
+    }
+
+    final bool remoteSignalMatches =
+        widget.preferences.remotePlanSignalJobID == pendingJobID;
+    if (!force &&
+        !remoteSignalMatches &&
+        _pendingTrainingPlanJob != null &&
+        _pendingTrainingPlanJob!.id == pendingJobID &&
+        _pendingTrainingPlanJob!.isActive) {
+      return;
+    }
+
+    try {
+      final String token = await _requireIdToken();
+      final http.Response response = await _performRequest(
+        () => http.get(
+          AppBackend.trainingPlanJob(pendingJobID),
+          headers: <String, String>{
+            HttpHeaders.authorizationHeader: 'Bearer $token',
+          },
+        ),
+        action: 'check training plan status',
+      );
+
+      if (response.statusCode == HttpStatus.notFound) {
+        await widget.preferences.clearPendingTrainingPlanJobID(currentUser.uid);
+        await widget.preferences.clearRemotePlanSignal();
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _pendingTrainingPlanJob = null;
+          _showPlanBuilder = _latestTrainingPlan == null;
+        });
+        return;
+      }
+
+      if (response.statusCode >= 400) {
+        return;
+      }
+
+      final _TrainingPlanJob? job =
+          _parseTrainingPlanJobFromResponse(response.body);
+      if (job == null) {
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pendingTrainingPlanJob = job;
+      });
+
+      if (job.status == _trainingPlanJobCompletedStatus) {
+        await widget.preferences.clearPendingTrainingPlanJobID(currentUser.uid);
+        await widget.preferences.clearRemotePlanSignal();
+        await _hydrateLatestTrainingPlanForSignedInUser();
+        if (mounted) {
+          setState(() {
+            _showPlanBuilder = _latestTrainingPlan == null;
+          });
+        }
+        return;
+      }
+
+      if (job.status == _trainingPlanJobFailedStatus) {
+        await widget.preferences.clearPendingTrainingPlanJobID(currentUser.uid);
+        await widget.preferences.clearRemotePlanSignal();
+        if (mounted) {
+          setState(() {
+            _showPlanBuilder = true;
+          });
+        }
+        if (job.errorMessage.isNotEmpty) {
+          _setStatus(job.errorMessage);
+        } else {
+          _setStatus('Training plan generation failed. Please try again.');
+        }
+        return;
+      }
+
+      if (remoteSignalMatches) {
+        await widget.preferences.clearRemotePlanSignal();
+      }
+    } on _UiException {
+      // Best effort refresh.
+    } on _BackendConnectivityException {
+      // Best effort refresh.
     }
   }
 
@@ -415,6 +628,21 @@ class _HomeScreenState extends State<HomeScreen>
           status: _status,
           onCreateAccount: _signUp,
           onSignIn: _signIn,
+        ),
+      );
+    }
+
+    if (!hasPlan && _pendingTrainingPlanJob != null) {
+      return _buildFullscreenScaffold(
+        child: _CenteredCoachState(
+          eyebrow: 'Coach',
+          title: 'Your first block is being forged',
+          body: _pendingTrainingPlanJob!.status == _trainingPlanJobFailedStatus
+              ? (_pendingTrainingPlanJob!.errorMessage.isNotEmpty
+                  ? _pendingTrainingPlanJob!.errorMessage
+                  : 'The last plan request failed. Please try again.')
+              : 'The request was sent. You can close the app and come back later; we will refresh as soon as the plan is ready.',
+          loading: _pendingTrainingPlanJob!.isActive,
         ),
       );
     }
@@ -2132,7 +2360,7 @@ class _HomeScreenState extends State<HomeScreen>
     _planEquipmentController.text = '';
     _planNotesController.text = _buildPlanNotesFromProfile(result);
 
-    await _generateTrainingPlan();
+    final _TrainingPlanJob? pendingJob = await _generateTrainingPlan();
     if (!mounted) {
       return;
     }
@@ -2142,7 +2370,7 @@ class _HomeScreenState extends State<HomeScreen>
     } on _UiException {
       // Let the generated plan drive the happy path even if profile refresh lags.
     }
-    if (_latestTrainingPlan != null) {
+    if (_latestTrainingPlan != null || pendingJob != null) {
       setState(() {
         _showPlanBuilder = false;
       });
@@ -2200,11 +2428,12 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  Future<void> _generateTrainingPlan() async {
+  Future<_TrainingPlanJob?> _generateTrainingPlan() async {
     setState(() {
       _generatingTrainingPlan = true;
     });
 
+    _TrainingPlanJob? submittedJob;
     try {
       await _runBusyAction(() async {
         final String token = await _requireIdToken();
@@ -2254,40 +2483,38 @@ class _HomeScreenState extends State<HomeScreen>
           return;
         }
 
-        if (response.statusCode >= 400) {
+        if (response.statusCode != HttpStatus.accepted) {
           throw _UiException(_formatBackendFailure(
-            action: 'generate the training plan',
+            action: 'queue the training plan request',
             response: response,
           ));
         }
 
-        final _TrainingPlanResult? plan = _parseTrainingPlanFromResponse(body);
-        if (plan == null) {
-          _setStatus('Training plan response did not include plan data.');
+        final _TrainingPlanJob? job = _parseTrainingPlanJobFromResponse(body);
+        if (job == null) {
+          _setStatus('Training plan queue response did not include job data.');
           return;
         }
 
-        setState(() {
-          _latestTrainingPlan = plan;
-        });
+        submittedJob = job;
         final User? currentUser = _auth.currentUser;
         if (currentUser != null) {
-          await widget.localCacheRepository.cacheTrainingPlan(
-            planId: plan.planID,
+          await widget.preferences.setPendingTrainingPlanJobID(
             firebaseUid: currentUser.uid,
-            payloadJson: body,
+            jobID: job.id,
           );
         }
-        await _loadWorkoutLogsForPlan(
-          token,
-          plan.planID,
-          announceStatus: false,
+
+        setState(() {
+          _pendingTrainingPlanJob = job;
+          _latestTrainingPlan = null;
+          _showPlanBuilder = false;
+        });
+        _setStatus(
+          job.created
+              ? 'Your coach is writing the block now.'
+              : 'A training plan is already being generated.',
         );
-        await _syncDisplayedWeekForCurrentPlan();
-        await _maybeLoadWeeklyCoachingPreview(token, plan);
-        _setStatus(plan.generated
-            ? 'Training plan generated.'
-            : 'Stored training plan loaded.');
       });
     } finally {
       if (mounted) {
@@ -2296,6 +2523,8 @@ class _HomeScreenState extends State<HomeScreen>
         });
       }
     }
+
+    return submittedJob;
   }
 
   Future<void> _handleWeekdayLongPress(
@@ -2819,19 +3048,6 @@ class _HomeScreenState extends State<HomeScreen>
       return;
     }
 
-    if (!force && DateTime.now().weekday != DateTime.monday) {
-      if (_weeklyCoachingPreview != null && mounted) {
-        setState(() {
-          _weeklyCoachingPreview = null;
-        });
-      }
-      await widget.preferences.clearWeeklyPreviewCache(
-        firebaseUid: currentUser.uid,
-        trainingPlanId: plan.planID,
-      );
-      return;
-    }
-
     final List<_WorkoutLogItem> workoutLogsForPlan = _workoutLogsForPlan(
       plan.planID,
     );
@@ -3154,6 +3370,15 @@ class _HomeScreenState extends State<HomeScreen>
     return _normalizeTrainingPlanForMeasurementSystem(
       _TrainingPlanResult.fromJson(decoded),
     );
+  }
+
+  _TrainingPlanJob? _parseTrainingPlanJobFromResponse(String body) {
+    final Object? decoded = jsonDecode(body);
+    if (decoded is! Map<String, dynamic>) {
+      return null;
+    }
+
+    return _TrainingPlanJob.fromJson(decoded);
   }
 
   _WeeklyCoachingPreview? _parseWeeklyCoachingPreview(String body) {
@@ -6129,6 +6354,48 @@ class _TrainingPlanResult {
 
     return null;
   }
+}
+
+class _TrainingPlanJob {
+  const _TrainingPlanJob({
+    required this.id,
+    required this.created,
+    required this.status,
+    required this.objective,
+    required this.durationWeeks,
+    required this.daysPerWeek,
+    required this.measurementSystem,
+    required this.errorMessage,
+    required this.trainingPlanID,
+  });
+
+  factory _TrainingPlanJob.fromJson(Map<String, dynamic> json) {
+    return _TrainingPlanJob(
+      id: (json['id'] as String?) ?? '',
+      created: json['created'] as bool? ?? false,
+      status: (json['status'] as String?) ?? '',
+      objective: (json['objective'] as String?) ?? '',
+      durationWeeks: (json['duration_weeks'] as num?)?.toInt() ?? 0,
+      daysPerWeek: (json['days_per_week'] as num?)?.toInt() ?? 0,
+      measurementSystem: (json['measurement_system'] as String?) ?? '',
+      errorMessage: (json['error_message'] as String?) ?? '',
+      trainingPlanID: (json['training_plan_id'] as num?)?.toInt(),
+    );
+  }
+
+  final String id;
+  final bool created;
+  final String status;
+  final String objective;
+  final int durationWeeks;
+  final int daysPerWeek;
+  final String measurementSystem;
+  final String errorMessage;
+  final int? trainingPlanID;
+
+  bool get isActive =>
+      status == _trainingPlanJobQueuedStatus ||
+      status == _trainingPlanJobRunningStatus;
 }
 
 class _WeeklyCoachingPreview {

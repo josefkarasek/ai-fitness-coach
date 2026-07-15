@@ -3,6 +3,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AppPreferences {
   AppPreferences(this._prefs);
 
+  static const String measurementSystemKey = 'measurement_system';
+  static const String onboardingCompletedKey = 'onboarding_completed';
+  static const String lastSignedInUidKey = 'last_signed_in_uid';
+  static const String remotePlanSignalJobIDKey = 'remote_plan_signal_job_id';
+  static const String remotePlanSignalStatusKey = 'remote_plan_signal_status';
+
   static const String _measurementSystemKey = 'measurement_system';
   static const String _onboardingCompletedKey = 'onboarding_completed';
   static const String _lastSignedInUidKey = 'last_signed_in_uid';
@@ -10,6 +16,8 @@ class AppPreferences {
   static const String _activePlanWeekAnchorPrefix = 'active_plan_week_anchor';
   static const String _weeklyPreviewCachePrefix = 'weekly_preview_cache';
   static const String _weeklyPreviewAnchorPrefix = 'weekly_preview_anchor';
+  static const String _pendingTrainingPlanJobPrefix =
+      'pending_training_plan_job';
 
   final SharedPreferences _prefs;
 
@@ -31,6 +39,42 @@ class AppPreferences {
 
   Future<void> setLastSignedInUid(String value) async {
     await _prefs.setString(_lastSignedInUidKey, value);
+  }
+
+  String getPendingTrainingPlanJobID(String firebaseUid) {
+    return _prefs.getString('$_pendingTrainingPlanJobPrefix:$firebaseUid') ??
+        '';
+  }
+
+  Future<void> setPendingTrainingPlanJobID({
+    required String firebaseUid,
+    required String jobID,
+  }) async {
+    await _prefs.setString(
+        '$_pendingTrainingPlanJobPrefix:$firebaseUid', jobID);
+  }
+
+  Future<void> clearPendingTrainingPlanJobID(String firebaseUid) async {
+    await _prefs.remove('$_pendingTrainingPlanJobPrefix:$firebaseUid');
+  }
+
+  String get remotePlanSignalJobID =>
+      _prefs.getString(remotePlanSignalJobIDKey) ?? '';
+
+  String get remotePlanSignalStatus =>
+      _prefs.getString(remotePlanSignalStatusKey) ?? '';
+
+  Future<void> setRemotePlanSignal({
+    required String jobID,
+    required String status,
+  }) async {
+    await _prefs.setString(remotePlanSignalJobIDKey, jobID);
+    await _prefs.setString(remotePlanSignalStatusKey, status);
+  }
+
+  Future<void> clearRemotePlanSignal() async {
+    await _prefs.remove(remotePlanSignalJobIDKey);
+    await _prefs.remove(remotePlanSignalStatusKey);
   }
 
   int? activePlanWeekNumber({

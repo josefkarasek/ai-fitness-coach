@@ -20,6 +20,11 @@ class AppBackend {
 
   static Uri latestTrainingPlan() => _uri('/api/v1/training-plans/latest');
 
+  static Uri trainingPlanJob(String jobId) =>
+      _uri('/api/v1/training-plan-jobs/$jobId');
+
+  static Uri deviceTokens() => _uri('/api/v1/device-tokens');
+
   static Uri _uri(String path) {
     final Uri baseUri = Uri.parse(baseUrl);
     final String normalizedBasePath = baseUri.path.endsWith('/')

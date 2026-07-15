@@ -26,6 +26,7 @@ type Config struct {
 	AIModel                        string
 	AIBaseURL                      string
 	AIAPIKey                       string
+	AITrainingPlanJobTimeout       int
 	AIDailyWorkoutExplanationLimit int
 	AIDailyWorkoutReviewLimit      int
 	AIDailyTrainingPlanLimit       int
@@ -46,6 +47,7 @@ func Load() Config {
 		AIModel:                        getEnv("AI_MODEL", "mock-workout-explainer-v1"),
 		AIBaseURL:                      getEnv("AI_BASE_URL", ""),
 		AIAPIKey:                       getEnv("AI_API_KEY", ""),
+		AITrainingPlanJobTimeout:       getIntEnv("AI_TRAINING_PLAN_JOB_TIMEOUT_SECONDS", 300),
 		AIDailyWorkoutExplanationLimit: getIntEnv("AI_DAILY_WORKOUT_EXPLANATIONS_LIMIT", 3),
 		AIDailyWorkoutReviewLimit:      getIntEnv("AI_DAILY_WORKOUT_REVIEWS_LIMIT", 12),
 		AIDailyTrainingPlanLimit:       getIntEnv("AI_DAILY_TRAINING_PLANS_LIMIT", 3),

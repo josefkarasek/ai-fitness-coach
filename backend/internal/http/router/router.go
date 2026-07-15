@@ -10,6 +10,7 @@ func New(
 	landingHandler *handlers.LandingHandler,
 	healthHandler *handlers.HealthHandler,
 	authHandler *handlers.AuthHandler,
+	deviceTokensHandler *handlers.DeviceTokensHandler,
 	promoCodeHandler *handlers.PromoCodeHandler,
 	importHandler *handlers.ImportHandler,
 	workoutsHandler *handlers.WorkoutsHandler,
@@ -38,6 +39,9 @@ func New(
 		protected := v1.Group("")
 		protected.Use(authentication.RequireAuth())
 		protected.GET("/me", authHandler.Me)
+		if deviceTokensHandler != nil {
+			protected.POST("/device-tokens", deviceTokensHandler.Upsert)
+		}
 		if promoCodeHandler != nil {
 			protected.POST("/promo-codes/redeem", promoCodeHandler.Redeem)
 		}
@@ -57,6 +61,7 @@ func New(
 		if trainingPlansHandler != nil {
 			protected.POST("/training-plans", trainingPlansHandler.Create)
 			protected.GET("/training-plans/latest", trainingPlansHandler.Latest)
+			protected.GET("/training-plan-jobs/:id", trainingPlansHandler.Job)
 			if plannedExerciseExplanationHandler != nil {
 				protected.POST("/training-plans/:id/exercise-explanation", plannedExerciseExplanationHandler.Create)
 			}
