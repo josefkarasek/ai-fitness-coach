@@ -1,0 +1,17 @@
+{
+  "project": "liftsforge",
+  "platform": "ios",
+  "github": {
+    "owner": "josefkarasek",
+    "repo": "ai-fitness-coach"
+  },
+  "ios": {
+    "path": "ios"
+  },
+  "flutter": {
+    "version": "3.44.5",
+    "watch": {}
+  },
+  "reactNative": {},
+  "mobai": {}
+}
