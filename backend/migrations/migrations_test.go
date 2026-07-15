@@ -21,4 +21,16 @@ func TestLoad(t *testing.T) {
 	if migrations[0].sql == "" {
 		t.Fatal("expected embedded SQL contents to be non-empty")
 	}
+
+	if len(migrations) < 2 {
+		t.Fatal("expected versioned follow-up migrations after the initial schema")
+	}
+
+	if migrations[1].version != "000002_training_plan_jobs_and_push_tokens" {
+		t.Fatalf(
+			"expected second migration version %q, got %q",
+			"000002_training_plan_jobs_and_push_tokens",
+			migrations[1].version,
+		)
+	}
 }
