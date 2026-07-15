@@ -97,11 +97,11 @@ jobs:
             --service "$RAILWAY_SERVICE" \
             --json
 
-      - name: Redeploy Railway service from image source
-        run: |
-          railway redeploy \
-            --from-source \
-            --yes \
-            --project "$RAILWAY_PROJECT_ID" \
-            --environment "$RAILWAY_ENVIRONMENT" \
-            --service "$RAILWAY_SERVICE"
+      # - name: Redeploy Railway service from image source
+      #   run: |
+      #     railway redeploy \
+      #       --from-source \
+      #       --yes \
+      #       --project "$RAILWAY_PROJECT_ID" \
+      #       --environment "$RAILWAY_ENVIRONMENT" \
+      #       --service "$RAILWAY_SERVICE"
