@@ -1,0 +1,204 @@
+name: iOS Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: "Unique build identifier"
+        required: true
+        type: string
+      app_path:
+        description: "Path to the Flutter app inside the repository"
+        required: false
+        type: string
+        default: "client_flutter"
+      ios_path:
+        description: "Path to the iOS project relative to the app path"
+        required: false
+        type: string
+        default: "ios"
+      scheme:
+        description: "Xcode scheme to build"
+        required: false
+        type: string
+        default: "Runner"
+      use_signing:
+        description: "Enable code signing (requires secrets)"
+        required: false
+        type: boolean
+        default: false
+      configuration:
+        description: "Build configuration"
+        required: false
+        type: choice
+        options:
+          - Debug
+          - Release
+        default: Debug
+      flutter_version:
+        description: "Flutter version to use"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      APP_PATH: ${{ inputs.app_path }}
+      IOS_PATH: ${{ inputs.app_path }}/${{ inputs.ios_path }}
+      BUILD_ID: ${{ inputs.build_id }}
+      SCHEME: ${{ inputs.scheme }}
+      CONFIGURATION: ${{ inputs.configuration }}
+      USE_SIGNING: ${{ inputs.use_signing }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Set up Flutter (latest stable)
+        if: inputs.flutter_version == ''
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Set up Flutter (pinned version)
+        if: inputs.flutter_version != ''
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ inputs.flutter_version }}
+          channel: stable
+          cache: true
+
+      - name: Restore CocoaPods cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.IOS_PATH }}/Pods
+            ~/.cocoapods/repos
+          key: pods-${{ runner.os }}-${{ hashFiles(format('{0}/Podfile.lock', env.IOS_PATH)) }}
+          restore-keys: |
+            pods-${{ runner.os }}-
+
+      - name: Flutter pub get
+        working-directory: ${{ env.APP_PATH }}
+        run: flutter pub get
+
+      - name: Install certificate and provisioning profile
+        if: inputs.use_signing
+        env:
+          IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          set -euo pipefail
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          CERTIFICATE_PATH="$RUNNER_TEMP/certificate.p12"
+          echo "$IOS_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
+          security import "$CERTIFICATE_PATH" -P "$IOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          echo "$IOS_PROVISIONING_PROFILE" | base64 --decode > "$PROFILE_PATH"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_UUID="$(security cms -D -i "$PROFILE_PATH" | plutil -extract UUID raw -)"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Pod install
+        working-directory: ${{ env.IOS_PATH }}
+        run: pod install
+
+      - name: Build Flutter iOS app
+        working-directory: ${{ env.APP_PATH }}
+        run: |
+          set -euo pipefail
+          if [ "$CONFIGURATION" = "Debug" ]; then
+            flutter build ios --debug --no-codesign
+          else
+            flutter build ios --release --no-codesign
+          fi
+
+      - name: Archive signed app
+        if: inputs.use_signing
+        working-directory: ${{ env.IOS_PATH }}
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace Runner.xcworkspace \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -destination "generic/platform=iOS" \
+            -archivePath "$GITHUB_WORKSPACE/build/App.xcarchive" \
+            archive
+
+      - name: Export signed IPA
+        if: inputs.use_signing
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>development</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath "$GITHUB_WORKSPACE/build/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$GITHUB_WORKSPACE/build/export"
+
+          mv "$GITHUB_WORKSPACE"/build/export/*.ipa "$GITHUB_WORKSPACE/build/$BUILD_ID.ipa"
+
+      - name: Package unsigned IPA
+        if: ${{ !inputs.use_signing }}
+        run: |
+          set -euo pipefail
+          APP_PATH_ON_DISK="$(find "$GITHUB_WORKSPACE/$APP_PATH/build/ios/iphoneos" -name "*.app" -type d | head -1)"
+          if [ -z "$APP_PATH_ON_DISK" ]; then
+            echo "Could not find compiled .app bundle"
+            exit 1
+          fi
+
+          mkdir -p "$GITHUB_WORKSPACE/build/Payload"
+          cp -R "$APP_PATH_ON_DISK" "$GITHUB_WORKSPACE/build/Payload/"
+          cd "$GITHUB_WORKSPACE/build"
+          zip -rq "$BUILD_ID.ipa" Payload
+          rm -rf Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipa
+          path: build/*.ipa
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Cleanup signing
+        if: always() && inputs.use_signing
+        run: |
+          if [ -n "${KEYCHAIN_PATH:-}" ] && [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH" || true
+          fi

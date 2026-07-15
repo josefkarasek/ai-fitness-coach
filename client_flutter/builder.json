@@ -6,7 +6,8 @@
     "repo": "ai-fitness-coach"
   },
   "ios": {
-    "path": "ios"
+    "path": "ios",
+    "scheme": "Runner"
   },
   "flutter": {
     "version": "3.44.5",
