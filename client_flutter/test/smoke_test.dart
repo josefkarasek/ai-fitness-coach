@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:Forge/src/app.dart';
-import 'package:Forge/src/app_dependencies.dart';
-import 'package:Forge/src/settings/app_preferences.dart';
-import 'package:Forge/src/storage/local/app_database.dart';
-import 'package:Forge/src/storage/local/local_cache_repository.dart';
+import 'package:forge/src/app.dart';
+import 'package:forge/src/app_dependencies.dart';
+import 'package:forge/src/settings/app_preferences.dart';
+import 'package:forge/src/storage/local/app_database.dart';
+import 'package:forge/src/storage/local/local_cache_repository.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

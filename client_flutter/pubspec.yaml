@@ -1,4 +1,4 @@
-name: Forge
+name: forge
 description: Thin Flutter client for the Forge backend.
 publish_to: "none"
 
